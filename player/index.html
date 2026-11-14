@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduBridge Accessible Player</title>
+    <style>
+      :focus-visible {
+        outline: 3px solid #005fcc;
+        outline-offset: 3px;
+      }
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        padding: 2rem;
+        background-color: #f8fafc;
+        color: #0f172a;
+      }
+      .skip-link {
+        position: absolute;
+        top: -100px;
+        left: 1rem;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        text-decoration: underline;
+        z-index: 1000;
+      }
+      .skip-link:focus {
+        top: 1rem;
+      }
+      main {
+        max-width: 800px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 2rem;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+      }
+    </style>
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <main id="main-content" tabindex="-1">
+      <h1>EduBridge Accessible Player</h1>
+      <p>Accessible media player placeholder. Designed for zero-dependency embedding, low-bandwidth 3G, and screen reader compatibility.</p>
+    </main>
+    <script src="embed.js"></script>
+  </body>
+</html>

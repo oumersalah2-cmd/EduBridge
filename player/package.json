@@ -1,0 +1,11 @@
+{
+  "name": "edubridge-player",
+  "version": "1.0.0",
+  "description": "Zero-dependency accessible media player for EduBridge",
+  "scripts": {
+    "a11y": "axe index.html --exit"
+  },
+  "devDependencies": {
+    "@axe-core/cli": "^4.10.1"
+  }
+}
