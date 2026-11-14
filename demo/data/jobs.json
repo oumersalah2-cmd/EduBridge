@@ -1,0 +1,86 @@
+[
+  {
+    "id": "job-et-01",
+    "title": "Junior Front-End Developer (Accessibility Focus)",
+    "titleAm": "ጀማሪ የፊት-ለፊት ሶፍትዌር አበልጻጊ (ተደራሽነት)",
+    "employer": "Gebeya Inc.",
+    "location": "Addis Ababa, Ethiopia (Hybrid)",
+    "employmentType": "FULL_TIME",
+    "deadline": "2026-12-15",
+    "audioSummary": "Gebeya is hiring a Junior Front-End Developer with passion for web accessibility. Requirements include HTML, CSS, JavaScript, and WCAG awareness. Accommodation provided for candidates with disabilities.",
+    "audioSummaryAm": "ገበያ ኢንክ የድር ተደራሽነት ፍላጎት ያለው ጀማሪ የፊት-ለፊት ሶፍትዌር አበልጻጊ እየቀጠረ ነው። መስፈርቶች ኤችቲኤምኤል፣ ሲኤስኤስ፣ ጃቫስክሪፕት እና የተደራሽነት ግንዛቤን ያካትታሉ። ለአካል ጉዳተኛ አመልካቾች ድጋፍ ይሰጣል።",
+    "description": "We are seeking a junior frontend developer dedicated to building inclusive web experiences. The candidate will work on accessible user interfaces, keyboard navigation, and screen reader compatibility.",
+    "requirements": [
+      "Basic understanding of semantic HTML5 and modern CSS",
+      "Familiarity with WCAG 2.2 Level AA accessibility guidelines",
+      "Eagerness to learn screen reader testing (NVDA, TalkBack)",
+      "Strong team collaboration and communication"
+    ],
+    "accommodations": "Sign language interpreter provided for technical interviews; flexible remote work days; screen reader licensed tools provided.",
+    "applyUrl": "https://careers.gebeya.com/apply/a11y-dev",
+    "schema": {
+      "@context": "https://schema.org",
+      "@type": "JobPosting",
+      "title": "Junior Front-End Developer",
+      "description": "We are seeking a junior frontend developer dedicated to building inclusive web experiences.",
+      "datePosted": "2026-11-14",
+      "validThrough": "2026-12-15",
+      "employmentType": "FULL_TIME",
+      "hiringOrganization": {
+        "@type": "Organization",
+        "name": "Gebeya Inc."
+      },
+      "jobLocation": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Addis Ababa",
+          "addressCountry": "ET"
+        }
+      },
+      "jobBenefits": "Sign language interpretation for interviews, flexible hours, accessible workplace"
+    }
+  },
+  {
+    "id": "job-et-02",
+    "title": "Data Annotation Specialist (Amharic & English)",
+    "titleAm": "የመረጃ ማብራሪያ ባለሙያ (አማርኛ እና እንግሊዝኛ)",
+    "employer": "iCog Labs",
+    "location": "Addis Ababa, Ethiopia (Remote)",
+    "employmentType": "CONTRACT",
+    "deadline": "2026-12-01",
+    "audioSummary": "iCog Labs is looking for an Amharic Data Annotation Specialist. Remote position evaluating Amharic speech and text. Screen reader users warmly welcome.",
+    "audioSummaryAm": "አይኮግ ላብስ የአማርኛ መረጃ ማብራሪያ ባለሙያ ይፈልጋል። የአማርኛ ንግግር እና ጽሑፍን የሚገመግም የርቀት ስራ ነው። የስክሪን አንባቢ ተጠቃሚዎች በአክብሮት ይጋበዛሉ።",
+    "description": "Evaluate and annotate transcribed Amharic audio recordings for local language speech models.",
+    "requirements": [
+      "Fluent in spoken and written Amharic",
+      "Strong attention to detail in text transcription",
+      "Comfortable with browser-based annotation portals"
+    ],
+    "accommodations": "Fully remote; screen-reader accessible web portal; flexible working hours.",
+    "applyUrl": "https://icog-labs.com/careers/data-annotator",
+    "schema": {
+      "@context": "https://schema.org",
+      "@type": "JobPosting",
+      "title": "Data Annotation Specialist (Amharic & English)",
+      "description": "Evaluate and annotate transcribed Amharic audio recordings for local language speech models.",
+      "datePosted": "2026-11-14",
+      "validThrough": "2026-12-01",
+      "employmentType": "CONTRACTOR",
+      "jobLocationType": "TELECOMMUTE",
+      "hiringOrganization": {
+        "@type": "Organization",
+        "name": "iCog Labs"
+      },
+      "jobLocation": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Addis Ababa",
+          "addressCountry": "ET"
+        }
+      }
+    }
+  }
+]
+
