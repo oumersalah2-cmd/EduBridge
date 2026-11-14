@@ -21,11 +21,13 @@ const app = express();
 app.disable('x-powered-by');
 
 // CORS: allow Studio, Player, and Partner origins
-app.use(cors({
+const corsOptions = {
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'X-Studio-Key', 'Last-Event-ID']
-}));
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Body parsers
 app.use(express.json({ limit: '10mb' }));

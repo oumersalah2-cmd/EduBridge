@@ -6,8 +6,9 @@ const archiver = require('archiver');
 
 const studioKey = require('../middleware/studioKey');
 const Video = require('../models/Video');
+const { getPublicBaseUrl, toAbsoluteUrl } = require('../services/urlHelper');
 const {
-  mockPublicVideo,
+  getMockPublicVideo,
   getMockVideoProgress,
   registerMockVideo
 } = require('./mockData');
@@ -61,7 +62,6 @@ const upload = multer({
   }
 });
 
-// Helper to validate WebVTT content
 function isValidWebVTT(content) {
   if (!content || typeof content !== 'string') return false;
   const trimmed = content.trim();
@@ -105,6 +105,8 @@ videosRouter.post(
         status: 'uploaded',
         progress: 0,
         step: 'Video uploaded. Queued for audio extraction and transcription.',
+        sourcePath: videoFile.path,
+        signPath: signFile ? signFile.path : null,
         videoPath: videoFile.path,
         videoUrl: `/uploads/videos/${videoFile.filename}`,
         signVideoPath: signFile ? signFile.path : null,
@@ -112,6 +114,10 @@ videosRouter.post(
       });
 
       await videoRecord.save();
+
+      // Trigger pipeline queue if not mock
+      const queue = require('../services/pipelineQueue');
+      queue.enqueue(videoRecord._id.toString());
 
       res.status(202).json({
         id: videoRecord._id.toString(),
@@ -203,7 +209,7 @@ videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
     video.captions[lang] = {
       vttPath: filepath,
       vttUrl: `/uploads/captions/${filename}`,
-      status: 'machine-generated', // Editing a track resets approval
+      status: 'machine-generated', // Editing resets approval
       approvedAt: null
     };
 
@@ -277,11 +283,11 @@ videosRouter.post('/:id/approve/:lang', studioKey, async (req, res, next) => {
 // POST /api/videos/:id/publish - Publish lesson, build pack & return embeds (X-Studio-Key)
 videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
   const { id } = req.params;
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const base = getPublicBaseUrl(req);
 
-  const embedScript = `<script src="${baseUrl}/player/embed.js" data-video-id="${id}"></script>`;
-  const embedIframe = `<iframe src="${baseUrl}/player/index.html?video=${id}" title="EduBridge Accessible Lesson Player" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
-  const offlinePackUrl = `/api/public/videos/${id}/offlinepack`;
+  const embedScript = `<script src="${base}/player/embed.js" data-video-id="${id}"></script>`;
+  const embedIframe = `<iframe src="${base}/player/index.html?video=${id}" title="EduBridge Accessible Lesson Player" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
+  const offlinePackUrl = `${base}/api/public/videos/${id}/offlinepack`;
 
   if (process.env.MOCK_API === 'true') {
     return res.json({
@@ -327,15 +333,12 @@ videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
 // Public Lesson Routes (/api/public/videos)
 // ==========================================
 
-// GET /api/public/videos/:id - Public metadata
+// GET /api/public/videos/:id - Public metadata with absolute URLs
 publicVideosRouter.get('/:id', async (req, res, next) => {
   const { id } = req.params;
 
-  if (process.env.MOCK_API === 'true' || id === mockPublicVideo.id) {
-    return res.json({
-      ...mockPublicVideo,
-      id
-    });
+  if (process.env.MOCK_API === 'true' || id === 'mock-video-demo-01') {
+    return res.json(getMockPublicVideo(id, req));
   }
 
   try {
@@ -354,23 +357,23 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
       id: video._id.toString(),
       title: video.title,
       status: video.status,
-      audioUrl: video.audioUrl,
-      signVideoUrl: video.signVideoUrl || null,
+      audioUrl: toAbsoluteUrl(video.audioUrl, req),
+      signVideoUrl: video.signVideoUrl ? toAbsoluteUrl(video.signVideoUrl, req) : null,
       captions: {
         en: video.captions?.en?.vttUrl
-          ? { url: video.captions.en.vttUrl, reviewStatus: video.captions.en.status }
+          ? { url: toAbsoluteUrl(video.captions.en.vttUrl, req), reviewStatus: video.captions.en.status }
           : undefined,
         am: video.captions?.am?.vttUrl
-          ? { url: video.captions.am.vttUrl, reviewStatus: video.captions.am.status }
+          ? { url: toAbsoluteUrl(video.captions.am.vttUrl, req), reviewStatus: video.captions.am.status }
           : undefined,
         om: video.captions?.om?.vttUrl
-          ? { url: video.captions.om.vttUrl, reviewStatus: video.captions.om.status }
+          ? { url: toAbsoluteUrl(video.captions.om.vttUrl, req), reviewStatus: video.captions.om.status }
           : undefined
       },
-      transcript: video.transcriptText || '',
+      transcript: video.transcript || video.transcriptText || '',
       chatLog: video.chatLog || [],
-      offlinePackUrl: video.offlinePackUrl || `/api/public/videos/${video._id}/offlinepack`,
-      brailleUrl: video.brailleUrl
+      offlinePackUrl: toAbsoluteUrl(video.offlinePackUrl || `/api/public/videos/${video._id}/offlinepack`, req),
+      brailleUrl: video.brailleUrl ? toAbsoluteUrl(video.brailleUrl, req) : `${getPublicBaseUrl(req)}/uploads/braille/demo_lesson.brf`
     });
   } catch (err) {
     next(err);
@@ -390,7 +393,6 @@ publicVideosRouter.get('/:id/offlinepack', (req, res, next) => {
   archive.on('error', (err) => next(err));
   archive.pipe(res);
 
-  // Add offline package files
   archive.append('EduBridge Audio-First Offline Lesson\nTranscript:\nWelcome to this accessible lesson on renewable energy.\n', {
     name: 'transcript.txt'
   });
@@ -402,7 +404,6 @@ publicVideosRouter.get('/:id/offlinepack', (req, res, next) => {
     name: 'lesson.brf'
   });
 
-  // Attach sample MP3 if present on disk, otherwise append sample buffer
   const sampleMp3Path = path.join(AUDIO_DIR, 'demo_lesson_64k.mp3');
   if (fs.existsSync(sampleMp3Path)) {
     archive.file(sampleMp3Path, { name: 'audio.mp3' });

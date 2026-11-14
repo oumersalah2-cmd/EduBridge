@@ -40,8 +40,11 @@ npm start
 ```
 
 ### Switching Mock Mode:
-- **Mock Mode ON:** Set `MOCK_API=true` in `.env` (returns realistic shapes, mock live stream, and video progress simulation).
-- **Mock Mode OFF:** Set `MOCK_API=false` in `.env` (runs full MongoDB and real media pipeline).
+- **Mock Mode ON (Default for Teammates):** Keep `MOCK_API=true` in `.env` (returns realistic shapes, mock live stream, and video progress simulation).
+  > [!IMPORTANT]
+  > **Teammates:** Keep `MOCK_API=true` until Member 1 announces that the real pipeline is ready.
+- **Mock Mode OFF:** Set `MOCK_API=false` in `.env` (activates real MongoDB storage and media pipeline).
+- **PUBLIC_BASE_URL:** Set in `.env` (default `http://localhost:4000`). All URLs (captions, audio, sign video, braille, offline pack, embed snippets, live joinUrl) are built as absolute URLs starting with this base. In classroom LAN hotspot mode, set this to your laptop's LAN IP (e.g. `http://192.168.1.50:4000`).
 
 ---
 
@@ -210,3 +213,4 @@ curl -s http://localhost:4000/api/jobs
 # 17. Get Specific Job Card
 curl -s http://localhost:4000/api/jobs/job-eth-01
 ```
+

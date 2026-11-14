@@ -5,6 +5,7 @@ const studioKey = require('../middleware/studioKey');
 const sseHub = require('../services/sseHub');
 const LiveSession = require('../models/LiveSession');
 const Video = require('../models/Video');
+const { getPublicBaseUrl } = require('../services/urlHelper');
 
 // Helper to generate a non-guessable 6-digit PIN
 function generatePin() {
@@ -40,7 +41,7 @@ router.post('/sessions', studioKey, async (req, res, next) => {
     }
 
     const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000); // 4-hour session
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getPublicBaseUrl(req);
     const joinUrl = `${baseUrl}/live/${pin}`;
 
     const sessionData = {
@@ -321,10 +322,11 @@ router.post('/sessions/:pin/end', studioKey, async (req, res, next) => {
     // Mongo offline
   }
 
+  const baseUrl = getPublicBaseUrl(req);
   res.json({
     videoId: recordedVideoId,
     status: 'ended',
-    offlinePackUrl: `/api/public/videos/${recordedVideoId}/offlinepack`
+    offlinePackUrl: `${baseUrl}/api/public/videos/${recordedVideoId}/offlinepack`
   });
 });
 

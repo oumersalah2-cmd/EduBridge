@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 const Job = require('../models/Job');
-const { mockJobs } = require('./mockData');
+const { getMockJobs } = require('./mockData');
 
 // Ensure at least 3 Ethiopian job postings exist in database if connected
 async function seedJobsIfEmpty() {
@@ -12,7 +12,8 @@ async function seedJobsIfEmpty() {
   try {
     const count = await Job.countDocuments();
     if (count === 0) {
-      await Job.insertMany(mockJobs.map(j => ({ ...j, _id: undefined })));
+      const defaultJobs = getMockJobs();
+      await Job.insertMany(defaultJobs.map(j => ({ ...j, _id: undefined })));
       console.log('Seeded 3 accessible Ethiopian job postings to database.');
     }
   } catch (err) {
@@ -20,34 +21,31 @@ async function seedJobsIfEmpty() {
   }
 }
 
-// When mongo connects, seed jobs
 mongoose.connection.on('connected', () => {
   seedJobsIfEmpty();
 });
 
-
 // GET /api/jobs - List accessible job cards
 router.get('/', async (req, res, next) => {
   if (process.env.MOCK_API === 'true') {
-    return res.json(mockJobs);
+    return res.json(getMockJobs(req));
   }
 
   try {
     const jobs = await Job.find().sort({ createdAt: -1 });
     if (!jobs || jobs.length === 0) {
-      // Fallback to seeded mock jobs if database has no records
-      return res.json(mockJobs);
+      return res.json(getMockJobs(req));
     }
     return res.json(jobs);
   } catch (err) {
-    // Return mock jobs on database disconnect rather than crashing
-    return res.json(mockJobs);
+    return res.json(getMockJobs(req));
   }
 });
 
 // GET /api/jobs/:id - Get specific job card
 router.get('/:id', async (req, res, next) => {
   const { id } = req.params;
+  const mockJobs = getMockJobs(req);
 
   if (process.env.MOCK_API === 'true') {
     const job = mockJobs.find((j) => j.id === id || j._id?.toString() === id);

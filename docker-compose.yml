@@ -19,6 +19,7 @@ services:
     environment:
       PORT: ${PORT:-4000}
       MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/edubridge}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
       HF_HOME: /root/.cache/huggingface
     ports:
       - "${PORT:-4000}:${PORT:-4000}"

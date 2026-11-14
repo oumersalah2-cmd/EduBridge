@@ -91,7 +91,7 @@ components:
       properties:
         url:
           type: string
-          example: "/uploads/captions/demo_lesson_en.vtt"
+          example: "http://localhost:4000/uploads/captions/demo_lesson_en.vtt"
         reviewStatus:
           type: string
           enum: [human-reviewed, machine-generated]
@@ -166,7 +166,7 @@ components:
           example: '<iframe src="http://localhost:4000/player/index.html?video=mock-vid-demo-01" title="EduBridge Accessible Lesson Player" width="100%" height="450" frameborder="0" allowfullscreen></iframe>'
         offlinePackUrl:
           type: string
-          example: "/api/public/videos/mock-vid-demo-01/offlinepack"
+          example: "http://localhost:4000/api/public/videos/mock-vid-demo-01/offlinepack"
 
     PublicVideoResponse:
       type: object
@@ -193,11 +193,11 @@ components:
           example: "published"
         audioUrl:
           type: string
-          example: "/uploads/audio/demo_lesson_64k.mp3"
+          example: "http://localhost:4000/uploads/audio/demo_lesson_64k.mp3"
         signVideoUrl:
           type: string
           nullable: true
-          example: "/uploads/sign/demo_lesson_sign.mp4"
+          example: "http://localhost:4000/uploads/sign/demo_lesson_sign.mp4"
         captions:
           type: object
           properties:
@@ -228,10 +228,10 @@ components:
                 type: number
         offlinePackUrl:
           type: string
-          example: "/api/public/videos/mock-video-demo-01/offlinepack"
+          example: "http://localhost:4000/api/public/videos/mock-video-demo-01/offlinepack"
         brailleUrl:
           type: string
-          example: "/uploads/braille/demo_lesson.brf"
+          example: "http://localhost:4000/uploads/braille/demo_lesson.brf"
 
     LiveSessionCreated:
       type: object
@@ -285,7 +285,7 @@ components:
           example: "ended"
         offlinePackUrl:
           type: string
-          example: "/api/public/videos/recorded-492018/offlinepack"
+          example: "http://localhost:4000/api/public/videos/recorded-492018/offlinepack"
 
     JobCard:
       type: object
@@ -331,10 +331,10 @@ components:
           example: "https://careers.ethiotelecom.et/accessibility-qa"
         certificateUrl:
           type: string
-          example: "/uploads/certs/accessible-qa-spec.pdf"
+          example: "http://localhost:4000/uploads/certs/accessible-qa-spec.pdf"
         audioSummaryUrl:
           type: string
-          example: "/uploads/jobs/job-eth-01-summary.mp3"
+          example: "http://localhost:4000/uploads/jobs/job-eth-01-summary.mp3"
         textSummary:
           type: string
           example: "Entry-level position testing telecom mobile applications for screen reader accessibility and low-bandwidth resilience."
