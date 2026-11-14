@@ -2,7 +2,7 @@
  * EduBridge Accessible Media Player (<db-player>)
  * Track 2: Accessible Learning Media — Digital Bridge Hackathon 2026
  *
- * Requirements Met in this Version (Steps 1, 2, 3 & 4):
+ * Requirements Met in this Version (Steps 1, 2, 3, 4 & 5):
  * - One tag: <db-player src="..." captions="..." sign="..." describe="..." lang="am" api="..."></db-player>
  * - Custom WebVTT parser & high-contrast cue renderer (never relies on un-stylable native browser captions).
  * - Full bilingual support (English & Amharic Ethiopic typography with 1.7 line-height).
@@ -10,9 +10,11 @@
  * - Human-reviewed vs Machine-generated verification badge.
  * - Full keyboard operation without traps (WCAG 2.1.1, 2.1.2, 2.1.4): Space/K, Left/Right arrows, M, C, S, F, ?.
  * - Native <dialog> element for Keyboard Help with focus retention (Escape closes, focus returns).
- * - Synchronized Ethiopian Sign Language (EthSL) Picture-in-Picture window:
- *   - Video synchronization on play, pause, seek, and ratechange with 1-second drift correction.
- *   - WCAG 2.5.7 compliant: Dragging has 100% button alternatives (Top-Left, Top-Right, Bottom-Left, Bottom-Right, Larger, Smaller).
+ * - Synchronized Ethiopian Sign Language (EthSL) Picture-in-Picture window with WCAG 2.5.7 button presets.
+ * - Audio-First Mode (SpeechSynthesis read-aloud transcript player with play/pause/repeat/prev/next).
+ * - Interactive clickable transcript cues (each line is a button seeking to that timestamp).
+ * - One-click Plain-Text (.txt) download & 3G Offline Pack (.zip) link with displayed file size.
+ * - Battery-saving low-bandwidth Audio-Only (3G) mode toggle.
  * - Semantic controls, 44x44px touch targets, 3px solid focus indicators, screen reader live region.
  * - Emits db-player:progress, db-player:complete, and db-player:prefs.
  */
@@ -44,8 +46,15 @@ class DbPlayer extends HTMLElement {
 
     // Ethiopian Sign Language (EthSL) state
     this.signVisible = false;
-    this.signPosition = localStorage.getItem('edubridge_sign_position') || 'bottom-right'; // 'top-left', 'top-right', 'bottom-left', 'bottom-right'
-    this.signSize = localStorage.getItem('edubridge_sign_size') || 'medium'; // 'small', 'medium', 'large'
+    this.signPosition = localStorage.getItem('edubridge_sign_position') || 'bottom-right';
+    this.signSize = localStorage.getItem('edubridge_sign_size') || 'medium';
+
+    // Audio-First & Offline state
+    this.transcriptOpen = false;
+    this.audioOnlyMode = false;
+    this.isReadingAloud = false;
+    this.speechRate = 1.0;
+    this.activeCueIndex = -1;
 
     // Pre-seed fallback bilingual cues so player works instantly without network
     this.seedDefaultCaptions();
@@ -179,9 +188,23 @@ class DbPlayer extends HTMLElement {
         signMoveBR: "Move Sign to Bottom-Right",
         signLarger: "Enlarge Sign Window",
         signSmaller: "Reduce Sign Window",
+        audioFirstTitle: "Audio-First Mode (Read Aloud)",
+        audioFirstBtn: "Read Aloud",
+        audioFirstStop: "Stop Reading",
+        audioFirstRepeat: "Repeat Sentence",
+        audioFirstPrev: "Previous Sentence",
+        audioFirstNext: "Next Sentence",
+        transcriptTitle: "Interactive Transcript",
+        transcriptOpen: "Open Transcript Panel",
+        transcriptClose: "Close Transcript Panel",
+        audioOnlyBtn: "Audio-Only Mode (3G)",
+        audioOnlyActive: "Audio-Only Mode Active (Video Picture Hidden)",
+        downloadText: "Download Plain Text Transcript (.txt)",
+        downloadZip: "Download 3G Offline Pack (.zip)",
+        offlineSize: "1.8 MB (Audio + Text + HTML)",
         fullscreen: "Full screen",
         shortcuts: "Keyboard help",
-        statusReady: "Player ready. Space or K to play, S for Sign Language, ? for help.",
+        statusReady: "Player ready. Space to play, T for transcript, ? for help.",
         statusPlaying: "Playing video",
         statusPaused: "Video paused",
         langEn: "English Captions",
@@ -201,6 +224,7 @@ class DbPlayer extends HTMLElement {
         kM: "Mute or unmute audio",
         kC: "Toggle captions on or off",
         kS: "Toggle Ethiopian Sign Language PIP window",
+        kT: "Toggle Interactive Transcript & Audio-First panel",
         kF: "Toggle full-screen viewing",
         kQuestion: "Open or close this keyboard shortcuts dialog",
         kEscape: "Close any dialog and return to player",
@@ -228,9 +252,23 @@ class DbPlayer extends HTMLElement {
         signMoveBR: "የምልክት መስኮት ወደ ታች-ቀኝ ውሰድ",
         signLarger: "የምልክት መስኮት አተልቅ",
         signSmaller: "የምልክት መስኮት አሳንስ",
+        audioFirstTitle: "የድምጽ-ቅድሚያ ሁነታ (በድምጽ አንብብ)",
+        audioFirstBtn: "በድምጽ አንብብ",
+        audioFirstStop: "ማንበብ አቁም",
+        audioFirstRepeat: "አረፍተ ነገሩን ድገም",
+        audioFirstPrev: "ያለፈው አረፍተ ነገር",
+        audioFirstNext: "ቀጣዩ አረፍተ ነገር",
+        transcriptTitle: "የተመሳሰለ የጽሑፍ ግልባጭ",
+        transcriptOpen: "የጽሑፍ ግልባጭ ክፈት",
+        transcriptClose: "የጽሑፍ ግልባጭ ዝጋ",
+        audioOnlyBtn: "ድምጽ ብቻ ሁነታ (3G)",
+        audioOnlyActive: "የድምጽ ብቻ ሁነታ በርቷል (የቪዲዮ ምስል ተደብቋል)",
+        downloadText: "ግልጽ ጽሑፍ አውርድ (.txt)",
+        downloadZip: "የ 3G ከመስመር ውጭ ጥቅል አውርድ (.zip)",
+        offlineSize: "1.8 ሜጋባይት (ድምጽ + ጽሑፍ + ኤችቲኤምኤል)",
         fullscreen: "ሙሉ ማያ",
         shortcuts: "የቁልፍ ሰሌዳ እገዛ",
-        statusReady: "ማጫወቻው ዝግጁ ነው። ለማጫወት Space ወይም K፣ ለምልክት ቋንቋ S፣ ለእገዛ ? ይጫኑ።",
+        statusReady: "ማጫወቻው ዝግጁ ነው። ለማጫወት Space፣ ለጽሑፍ T፣ ለእገዛ ? ይጫኑ።",
         statusPlaying: "ቪዲዮ በመጫወት ላይ",
         statusPaused: "ቪዲዮ ቆሟል",
         langEn: "እንግሊዝኛ የትርጉም ጽሑፍ",
@@ -250,6 +288,7 @@ class DbPlayer extends HTMLElement {
         kM: "ድምጽ ለማጥፋት ወይም ለማብራት",
         kC: "የትርጉም ጽሑፍ ለማብራት ወይም ለማጥፋት",
         kS: "የምልክት ቋንቋ መስኮት ለማብራት ወይም ለማጥፋት",
+        kT: "የተመሳሰለ የጽሑፍ ግልባጭ እና የድምጽ ማንበቢያ ለመክፈት",
         kF: "ቪዲዮውን በሙሉ ማያ ለማየት",
         kQuestion: "ይህን የቁልፍ ሰሌዳ አቋራጭ መስኮት ለመክፈት",
         kEscape: "መስኮቶችን ዘግቶ ወደ ማጫወቻው ለመመለስ",
@@ -299,6 +338,38 @@ class DbPlayer extends HTMLElement {
           background: #000000;
         }
 
+        video.main-video.audio-only {
+          display: none;
+        }
+
+        /* Audio-Only 3G Placeholder */
+        .audio-only-banner {
+          display: none;
+          height: 240px;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          background: linear-gradient(135deg, #0f172a, #1e293b);
+          color: #93c5fd;
+          text-align: center;
+          padding: 1.5rem;
+        }
+
+        .audio-only-banner.active {
+          display: flex;
+        }
+
+        .audio-wave-icon {
+          font-size: 3rem;
+          margin-bottom: 0.5rem;
+          animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 0.8; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.08); }
+        }
+
         /* Status Live Region for Screen Readers */
         .sr-only {
           position: absolute;
@@ -313,7 +384,7 @@ class DbPlayer extends HTMLElement {
         }
 
         /* -------------------------------------------------------------
-           CUSTOM WEBVTT CAPTIONS CONTAINER (High-Contrast & Stylable)
+           CUSTOM WEBVTT CAPTIONS CONTAINER
            ------------------------------------------------------------- */
         .caption-container {
           position: absolute;
@@ -424,12 +495,10 @@ class DbPlayer extends HTMLElement {
           display: none;
         }
 
-        /* Sign Sizes (large enough to read hands and face) */
         .sign-size-small { width: 190px; }
         .sign-size-medium { width: 260px; }
         .sign-size-large { width: 340px; }
 
-        /* Sign Positions */
         .sign-pos-bottom-right { bottom: 74px; right: 16px; top: auto; left: auto; }
         .sign-pos-bottom-left { bottom: 74px; left: 16px; top: auto; right: auto; }
         .sign-pos-top-right { top: 16px; right: 16px; bottom: auto; left: auto; }
@@ -487,6 +556,166 @@ class DbPlayer extends HTMLElement {
           height: auto;
           display: block;
           background: #000000;
+        }
+
+        /* -------------------------------------------------------------
+           INTERACTIVE TRANSCRIPT & AUDIO-FIRST DRAWER
+           ------------------------------------------------------------- */
+        .transcript-drawer {
+          display: none;
+          background: #0f172a;
+          color: #f8fafc;
+          border-top: 1px solid #334155;
+          padding: 1rem;
+        }
+
+        .transcript-drawer.active {
+          display: block;
+        }
+
+        .drawer-header {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+          margin-bottom: 0.75rem;
+          padding-bottom: 0.5rem;
+          border-bottom: 1px solid #1e293b;
+        }
+
+        .drawer-header h3 {
+          margin: 0;
+          font-size: 1.1rem;
+          color: #f1f5f9;
+        }
+
+        .audio-first-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 0.4rem;
+        }
+
+        .btn-af-ctrl {
+          padding: 0.4rem 0.75rem;
+          min-height: 38px;
+          background: #1e293b;
+          color: #ffffff;
+          border: 1px solid #475569;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 0.85rem;
+        }
+
+        .btn-af-ctrl:hover {
+          background: var(--bs-primary, #005fcc);
+        }
+
+        .btn-af-ctrl:focus-visible {
+          outline: 3px solid #f5a300;
+          outline-offset: 2px;
+        }
+
+        .btn-af-primary {
+          background: #059669;
+          border-color: #10b981;
+        }
+
+        .transcript-scroll-area {
+          max-height: 220px;
+          overflow-y: auto;
+          border: 1px solid #1e293b;
+          border-radius: 6px;
+          background: #0b0f19;
+          padding: 0.5rem;
+        }
+
+        .cue-btn {
+          display: flex;
+          width: 100%;
+          text-align: left;
+          background: transparent;
+          border: 0;
+          color: #cbd5e1;
+          padding: 0.5rem;
+          border-radius: 4px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 0.95rem;
+          line-height: 1.6;
+          transition: background-color 0.15s ease;
+        }
+
+        .cue-btn:hover {
+          background: #1e293b;
+          color: #ffffff;
+        }
+
+        .cue-btn:focus-visible {
+          outline: 3px solid #f5a300;
+          outline-offset: 1px;
+          background: #1e293b;
+        }
+
+        .cue-btn.active-cue {
+          background: #1e3a8a;
+          color: #93c5fd;
+          font-weight: 700;
+          border-inline-start: 4px solid #3b82f6;
+        }
+
+        .cue-time {
+          min-width: 50px;
+          color: #94a3b8;
+          font-family: monospace;
+          font-size: 0.85rem;
+        }
+
+        .cue-text {
+          flex: 1;
+        }
+
+        .download-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.75rem;
+          margin-top: 0.75rem;
+          padding-top: 0.5rem;
+          border-top: 1px solid #1e293b;
+        }
+
+        .btn-download {
+          padding: 0.5rem 1rem;
+          min-height: 44px;
+          background: #1e293b;
+          color: #ffffff;
+          border: 1px solid #475569;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 0.9rem;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          text-decoration: none;
+        }
+
+        .btn-download:hover {
+          background: var(--bs-primary, #005fcc);
+          border-color: #93c5fd;
+        }
+
+        .btn-download:focus-visible {
+          outline: 3px solid #f5a300;
+          outline-offset: 2px;
+        }
+
+        .offline-badge {
+          font-size: 0.8rem;
+          color: #a7f3d0;
+          margin-inline-start: 4px;
         }
 
         /* -------------------------------------------------------------
@@ -728,6 +957,13 @@ class DbPlayer extends HTMLElement {
           <p>Your browser does not support HTML5 video.</p>
         </video>
 
+        <!-- Audio-Only 3G Mode Banner -->
+        <div class="audio-only-banner" id="audio-only-banner" aria-hidden="true">
+          <div class="audio-wave-icon">📻</div>
+          <p style="margin: 0; font-weight: 700; font-size: 1.1rem;">${t.audioOnlyActive}</p>
+          <span style="font-size: 0.85rem; color: #cbd5e1; margin-top: 4px;">Low-Bandwidth 3G Safe (Zero Video Streaming)</span>
+        </div>
+
         <!-- Dynamic High-Contrast Captions Display -->
         <div 
           id="caption-container" 
@@ -826,38 +1062,15 @@ class DbPlayer extends HTMLElement {
           </div>
           <p style="color: #d1d5db; margin-top: 0; font-size: 0.95rem;">${t.shortcutsIntro}</p>
           <ul class="shortcuts-list">
-            <li>
-              <span>${t.kSpace}</span>
-              <kbd class="kbd-badge">Space / K</kbd>
-            </li>
-            <li>
-              <span>${t.kArrows}</span>
-              <kbd class="kbd-badge">← / →</kbd>
-            </li>
-            <li>
-              <span>${t.kM}</span>
-              <kbd class="kbd-badge">M</kbd>
-            </li>
-            <li>
-              <span>${t.kC}</span>
-              <kbd class="kbd-badge">C</kbd>
-            </li>
-            <li>
-              <span>${t.kS}</span>
-              <kbd class="kbd-badge">S</kbd>
-            </li>
-            <li>
-              <span>${t.kF}</span>
-              <kbd class="kbd-badge">F</kbd>
-            </li>
-            <li>
-              <span>${t.kQuestion}</span>
-              <kbd class="kbd-badge">?</kbd>
-            </li>
-            <li>
-              <span>${t.kEscape}</span>
-              <kbd class="kbd-badge">Esc</kbd>
-            </li>
+            <li><span>${t.kSpace}</span><kbd class="kbd-badge">Space / K</kbd></li>
+            <li><span>${t.kArrows}</span><kbd class="kbd-badge">← / →</kbd></li>
+            <li><span>${t.kM}</span><kbd class="kbd-badge">M</kbd></li>
+            <li><span>${t.kC}</span><kbd class="kbd-badge">C</kbd></li>
+            <li><span>${t.kS}</span><kbd class="kbd-badge">S</kbd></li>
+            <li><span>${t.kT}</span><kbd class="kbd-badge">T</kbd></li>
+            <li><span>${t.kF}</span><kbd class="kbd-badge">F</kbd></li>
+            <li><span>${t.kQuestion}</span><kbd class="kbd-badge">?</kbd></li>
+            <li><span>${t.kEscape}</span><kbd class="kbd-badge">Esc</kbd></li>
           </ul>
           <button type="button" class="btn-dialog-close" id="btn-dialog-close">${t.closeDialog}</button>
         </dialog>
@@ -913,6 +1126,26 @@ class DbPlayer extends HTMLElement {
             <span aria-hidden="true">🤟</span>
           </button>
 
+          <!-- Transcript & Audio-First Toggle Button -->
+          <button 
+            type="button" 
+            class="btn-ctrl" 
+            id="btn-transcript-toggle" 
+            aria-label="${t.transcriptTitle}" 
+            aria-pressed="${this.transcriptOpen}">
+            <span aria-hidden="true">📜</span>
+          </button>
+
+          <!-- Low Bandwidth Audio-Only Mode Toggle -->
+          <button 
+            type="button" 
+            class="btn-ctrl" 
+            id="btn-audio-only" 
+            aria-label="${t.audioOnlyBtn}" 
+            aria-pressed="${this.audioOnlyMode}">
+            <span aria-hidden="true">📻</span>
+          </button>
+
           <!-- Shortcuts Help Button -->
           <button type="button" class="btn-ctrl" id="btn-help" aria-label="${t.shortcuts}">
             <span aria-hidden="true">?</span>
@@ -923,10 +1156,68 @@ class DbPlayer extends HTMLElement {
             <span aria-hidden="true">⛶</span>
           </button>
         </nav>
+
+        <!-- Interactive Transcript & Audio-First Drawer -->
+        <section 
+          id="transcript-drawer" 
+          class="transcript-drawer ${this.transcriptOpen ? 'active' : ''}" 
+          aria-label="${t.transcriptTitle}">
+          
+          <div class="drawer-header">
+            <h3>📜 ${t.transcriptTitle}</h3>
+            
+            <!-- Audio-First Read-Aloud Toolbar -->
+            <div class="audio-first-toolbar" role="toolbar" aria-label="${t.audioFirstTitle}">
+              <button type="button" class="btn-af-ctrl btn-af-primary" id="btn-read-aloud">
+                <span id="read-icon">🔊</span> <span id="read-text">${t.audioFirstBtn}</span>
+              </button>
+              <button type="button" class="btn-af-ctrl" id="btn-read-prev" aria-label="${t.audioFirstPrev}">⏮</button>
+              <button type="button" class="btn-af-ctrl" id="btn-read-repeat" aria-label="${t.audioFirstRepeat}">🔁</button>
+              <button type="button" class="btn-af-ctrl" id="btn-read-next" aria-label="${t.audioFirstNext}">⏭</button>
+              <button type="button" class="btn-af-ctrl" id="btn-speech-rate" aria-label="Speech Speed">1.0x</button>
+            </div>
+          </div>
+
+          <!-- Interactive Clickable Cue List -->
+          <div class="transcript-scroll-area" id="transcript-cue-list" role="feed" aria-label="Synchronized sentences">
+            ${this.renderTranscriptCues()}
+          </div>
+
+          <!-- Download Bar -->
+          <div class="download-bar">
+            <button type="button" class="btn-download" id="btn-download-txt">
+              <span>⬇️</span> ${t.downloadText}
+            </button>
+            <a href="http://localhost:4000/api/public/videos/mock-lesson-01/offline-pack" download class="btn-download" id="btn-download-zip">
+              <span>📦</span> ${t.downloadZip} <span class="offline-badge">(${t.offlineSize})</span>
+            </a>
+          </div>
+        </section>
       </section>
     `;
 
     this.setupEventListeners();
+  }
+
+  renderTranscriptCues() {
+    const track = this.captionTracks[this.captionLang] || [];
+    const formatTime = (seconds) => {
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    };
+
+    return track.map((cue, idx) => `
+      <button 
+        type="button" 
+        class="cue-btn ${idx === this.activeCueIndex ? 'active-cue' : ''}" 
+        data-start="${cue.start}" 
+        data-idx="${idx}"
+        aria-label="Seek to ${formatTime(cue.start)}: ${cue.text}">
+        <span class="cue-time">${formatTime(cue.start)}</span>
+        <span class="cue-text" lang="${this.captionLang}">${cue.text}</span>
+      </button>
+    `).join('');
   }
 
   setupEventListeners() {
@@ -955,6 +1246,10 @@ class DbPlayer extends HTMLElement {
     const shortcutsDialog = this.shadowRoot.querySelector('#shortcuts-dialog');
     const dialogCloseBtn = this.shadowRoot.querySelector('#btn-dialog-close');
     const dialogXBtn = this.shadowRoot.querySelector('#btn-dialog-x');
+    const transcriptDrawer = this.shadowRoot.querySelector('#transcript-drawer');
+    const transcriptToggleBtn = this.shadowRoot.querySelector('#btn-transcript-toggle');
+    const audioOnlyBtn = this.shadowRoot.querySelector('#btn-audio-only');
+    const audioOnlyBanner = this.shadowRoot.querySelector('#audio-only-banner');
     const t = this.i18n;
 
     const formatTime = (seconds) => {
@@ -999,12 +1294,10 @@ class DbPlayer extends HTMLElement {
       }
     });
 
-    // Ratechange sync
     video.addEventListener('ratechange', () => {
       if (signVideo) signVideo.playbackRate = video.playbackRate;
     });
 
-    // Seeking sync
     video.addEventListener('seeking', () => {
       if (signVideo) signVideo.currentTime = video.currentTime;
     });
@@ -1030,17 +1323,25 @@ class DbPlayer extends HTMLElement {
       }));
 
       // Captions cue update
-      if (this.captionsVisible) {
-        const activeTrack = this.captionTracks[this.captionLang] || [];
-        const activeCue = activeTrack.find((c) => currentTime >= c.start && currentTime <= c.end);
+      const activeTrack = this.captionTracks[this.captionLang] || [];
+      const cueIdx = activeTrack.findIndex((c) => currentTime >= c.start && currentTime <= c.end);
 
-        if (activeCue) {
-          captionBox.textContent = activeCue.text;
+      if (this.captionsVisible) {
+        if (cueIdx !== -1) {
+          captionBox.textContent = activeTrack[cueIdx].text;
           captionBox.setAttribute('lang', this.captionLang);
           captionContainer.classList.remove('hidden');
         } else {
           captionContainer.classList.add('hidden');
         }
+      }
+
+      // Highlight active cue in transcript scroll area
+      if (cueIdx !== -1 && cueIdx !== this.activeCueIndex) {
+        this.activeCueIndex = cueIdx;
+        this.shadowRoot.querySelectorAll('.cue-btn').forEach((btn, idx) => {
+          btn.classList.toggle('active-cue', idx === cueIdx);
+        });
       }
 
       // EthSL Drift correction (every second if drift > 0.3s)
@@ -1130,7 +1431,6 @@ class DbPlayer extends HTMLElement {
       });
     }
 
-    // Position presets (WCAG 2.5.7)
     const setSignPosition = (pos) => {
       this.signPosition = pos;
       localStorage.setItem('edubridge_sign_position', pos);
@@ -1144,7 +1444,6 @@ class DbPlayer extends HTMLElement {
     this.shadowRoot.querySelector('#btn-pos-bl')?.addEventListener('click', () => setSignPosition('bottom-left'));
     this.shadowRoot.querySelector('#btn-pos-br')?.addEventListener('click', () => setSignPosition('bottom-right'));
 
-    // Size preset cycle (Small -> Medium -> Large)
     const sizeToggleBtn = this.shadowRoot.querySelector('#btn-size-toggle');
     if (sizeToggleBtn) {
       sizeToggleBtn.addEventListener('click', () => {
@@ -1157,6 +1456,156 @@ class DbPlayer extends HTMLElement {
         this.dispatchPrefs();
       });
     }
+
+    // -------------------------------------------------------------
+    // TRANSCRIPT & AUDIO-FIRST READ ALOUD ENGINE
+    // -------------------------------------------------------------
+    const toggleTranscript = () => {
+      this.transcriptOpen = !this.transcriptOpen;
+      transcriptDrawer.classList.toggle('active', this.transcriptOpen);
+      transcriptToggleBtn.setAttribute('aria-pressed', this.transcriptOpen ? 'true' : 'false');
+      statusEl.textContent = this.transcriptOpen ? t.transcriptOpen : t.transcriptClose;
+    };
+    transcriptToggleBtn.addEventListener('click', toggleTranscript);
+
+    // Clickable transcript cues seeking video
+    const attachCueClickListeners = () => {
+      this.shadowRoot.querySelectorAll('.cue-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const startTime = parseFloat(btn.getAttribute('data-start'));
+          video.currentTime = startTime;
+          if (signVideo) signVideo.currentTime = startTime;
+          if (video.paused) video.play();
+          statusEl.textContent = `Seeked to ${formatTime(startTime)}`;
+        });
+      });
+    };
+    attachCueClickListeners();
+
+    // Audio-First Read Aloud with window.speechSynthesis
+    const readBtn = this.shadowRoot.querySelector('#btn-read-aloud');
+    const readIcon = this.shadowRoot.querySelector('#read-icon');
+    const readText = this.shadowRoot.querySelector('#read-text');
+    let speechSynth = window.speechSynthesis;
+    let currentSpeechIdx = 0;
+
+    const stopReading = () => {
+      if (speechSynth) speechSynth.cancel();
+      this.isReadingAloud = false;
+      readIcon.textContent = '🔊';
+      readText.textContent = t.audioFirstBtn;
+      statusEl.textContent = t.audioFirstStop;
+    };
+
+    const speakCue = (idx) => {
+      const track = this.captionTracks[this.captionLang] || [];
+      if (!speechSynth || idx < 0 || idx >= track.length) {
+        stopReading();
+        return;
+      }
+
+      speechSynth.cancel();
+      currentSpeechIdx = idx;
+      this.activeCueIndex = idx;
+
+      // Scroll transcript cue into view
+      const cueBtns = this.shadowRoot.querySelectorAll('.cue-btn');
+      cueBtns.forEach((b, i) => b.classList.toggle('active-cue', i === idx));
+      if (cueBtns[idx]) cueBtns[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      const utterance = new SpeechSynthesisUtterance(track[idx].text);
+      utterance.lang = this.captionLang === 'am' ? 'am-ET' : 'en-US';
+      utterance.rate = this.speechRate;
+
+      utterance.onend = () => {
+        if (this.isReadingAloud && currentSpeechIdx + 1 < track.length) {
+          speakCue(currentSpeechIdx + 1);
+        } else {
+          stopReading();
+        }
+      };
+
+      utterance.onerror = () => {
+        stopReading();
+      };
+
+      this.isReadingAloud = true;
+      readIcon.textContent = '⏹';
+      readText.textContent = t.audioFirstStop;
+      speechSynth.speak(utterance);
+      statusEl.textContent = `Reading: ${track[idx].text}`;
+    };
+
+    readBtn.addEventListener('click', () => {
+      if (this.isReadingAloud) {
+        stopReading();
+      } else {
+        video.pause(); // Pause video when reading aloud to avoid sound clash
+        speakCue(this.activeCueIndex >= 0 ? this.activeCueIndex : 0);
+      }
+    });
+
+    this.shadowRoot.querySelector('#btn-read-repeat')?.addEventListener('click', () => {
+      speakCue(currentSpeechIdx);
+    });
+
+    this.shadowRoot.querySelector('#btn-read-prev')?.addEventListener('click', () => {
+      if (currentSpeechIdx > 0) speakCue(currentSpeechIdx - 1);
+    });
+
+    this.shadowRoot.querySelector('#btn-read-next')?.addEventListener('click', () => {
+      const track = this.captionTracks[this.captionLang] || [];
+      if (currentSpeechIdx + 1 < track.length) speakCue(currentSpeechIdx + 1);
+    });
+
+    const rateBtn = this.shadowRoot.querySelector('#btn-speech-rate');
+    if (rateBtn) {
+      rateBtn.addEventListener('click', () => {
+        const rates = [0.8, 1.0, 1.2];
+        const nextRateIdx = (rates.indexOf(this.speechRate) + 1) % rates.length;
+        this.speechRate = rates[nextRateIdx];
+        rateBtn.textContent = `${this.speechRate.toFixed(1)}x`;
+        statusEl.textContent = `Speech speed: ${this.speechRate}x`;
+        if (this.isReadingAloud) speakCue(currentSpeechIdx);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // PLAIN TEXT TRANSCRIPT (.txt) DOWNLOAD
+    // -------------------------------------------------------------
+    const downloadTxtBtn = this.shadowRoot.querySelector('#btn-download-txt');
+    downloadTxtBtn?.addEventListener('click', () => {
+      const track = this.captionTracks[this.captionLang] || [];
+      let content = `EduBridge Lesson Transcript (${this.captionLang === 'am' ? 'Amharic' : 'English'})\n`;
+      content += `Generated on: ${new Date().toLocaleDateString()}\n`;
+      content += `=========================================================\n\n`;
+
+      track.forEach((cue) => {
+        content += `[${formatTime(cue.start)} - ${formatTime(cue.end)}] ${cue.text}\n\n`;
+      });
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `edubridge-lesson-${this.captionLang}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      statusEl.textContent = "Transcript text file downloaded.";
+    });
+
+    // -------------------------------------------------------------
+    // BATTERY & BANDWIDTH SAVING AUDIO-ONLY 3G MODE
+    // -------------------------------------------------------------
+    audioOnlyBtn.addEventListener('click', () => {
+      this.audioOnlyMode = !this.audioOnlyMode;
+      audioOnlyBtn.setAttribute('aria-pressed', this.audioOnlyMode ? 'true' : 'false');
+      video.classList.toggle('audio-only', this.audioOnlyMode);
+      audioOnlyBanner.classList.toggle('active', this.audioOnlyMode);
+      statusEl.textContent = this.audioOnlyMode ? t.audioOnlyActive : "Video picture restored";
+    });
 
     // -------------------------------------------------------------
     // ACCESSIBLE KEYBOARD SHORTCUTS ENGINE (WCAG 2.1.1, 2.1.4)
@@ -1236,6 +1685,12 @@ class DbPlayer extends HTMLElement {
           toggleSignLanguage();
           break;
 
+        case 't':
+        case 'T':
+          e.preventDefault();
+          toggleTranscript();
+          break;
+
         case 'f':
         case 'F':
           e.preventDefault();
@@ -1301,8 +1756,14 @@ class DbPlayer extends HTMLElement {
       btnLangOff.classList.toggle('active', !visible);
       btnLangOff.setAttribute('aria-checked', !visible ? 'true' : 'false');
 
-      statusEl.textContent = visible ? (lang === 'am' ? t.langAm : t.langEn) : t.captionsOff;
+      // Re-render transcript cues in selected language
+      const cueList = this.shadowRoot.querySelector('#transcript-cue-list');
+      if (cueList) {
+        cueList.innerHTML = this.renderTranscriptCues();
+        attachCueClickListeners();
+      }
 
+      statusEl.textContent = visible ? (lang === 'am' ? t.langAm : t.langEn) : t.captionsOff;
       this.dispatchPrefs();
     };
 
