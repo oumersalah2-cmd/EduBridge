@@ -34,9 +34,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.text({ type: ['text/vtt', 'text/plain'], limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static file serving for uploads with accessible MIME types
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.resolve(__dirname, '../../uploads');
-app.use('/uploads', express.static(UPLOADS_DIR, {
+// Static file serving for uploads and tracked demo assets with accessible MIME types
+const staticHeaderOptions = {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.vtt')) {
       res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
@@ -50,7 +49,13 @@ app.use('/uploads', express.static(UPLOADS_DIR, {
       res.setHeader('Content-Type', 'video/mp4');
     }
   }
-}));
+};
+
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.resolve(__dirname, '../../uploads');
+app.use('/uploads', express.static(UPLOADS_DIR, staticHeaderOptions));
+
+const DEMO_ASSETS_DIR = path.resolve(__dirname, '../assets/demo');
+app.use('/assets/demo', express.static(DEMO_ASSETS_DIR, staticHeaderOptions));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

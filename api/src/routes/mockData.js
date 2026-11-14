@@ -123,22 +123,22 @@ function getMockPublicVideo(id = 'mock-video-demo-01', req) {
     id,
     title: 'Introduction to Renewable Solar Cells (Demo)',
     status: 'published',
-    audioUrl: `${base}/uploads/audio/demo_lesson_64k.mp3`,
-    signVideoUrl: `${base}/uploads/sign/demo_lesson_sign.mp4`,
+    audioUrl: `${base}/assets/demo/demo_lesson_64k.mp3`,
+    signVideoUrl: `${base}/assets/demo/demo_lesson_sign.mp4`,
     captions: {
       en: {
-        url: `${base}/uploads/captions/demo_lesson_en.vtt`,
+        url: `${base}/assets/demo/demo_lesson_en.vtt`,
         reviewStatus: 'human-reviewed'
       },
       am: {
-        url: `${base}/uploads/captions/demo_lesson_am.vtt`,
+        url: `${base}/assets/demo/demo_lesson_am.vtt`,
         reviewStatus: 'machine-generated'
       }
     },
     transcript: 'Welcome to this accessible lesson on renewable energy. Today we will explore solar photovoltaic cells and how they generate clean electricity. Notice how sunlight frees electrons in the semiconductor material.',
     chatLog: [],
     offlinePackUrl: `${base}/api/public/videos/${id}/offlinepack`,
-    brailleUrl: `${base}/uploads/braille/demo_lesson.brf`
+    brailleUrl: `${base}/assets/demo/demo_lesson.brf`
   };
 }
 

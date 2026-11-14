@@ -1,0 +1,7 @@
+# Allow demo assets to be tracked in git while real uploads remain ignored
+!assets/demo/
+!assets/demo/*
+!assets/demo/*.mp3
+!assets/demo/*.mp4
+!assets/demo/*.vtt
+!assets/demo/*.brf

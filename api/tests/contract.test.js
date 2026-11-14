@@ -153,11 +153,11 @@ describe('API Contract & Mock Mode Tests (Phase A)', () => {
       // Verify captions per language
       expect(res.body.captions).toHaveProperty('en');
       expect(res.body.captions.en.reviewStatus).toBe('human-reviewed');
-      expect(res.body.captions.en.url).toMatch(/\/uploads\/captions\/demo_lesson_en\.vtt$/);
+      expect(res.body.captions.en.url).toMatch(/\/(assets\/demo|uploads\/captions)\/demo_lesson_en\.vtt$/);
 
       expect(res.body.captions).toHaveProperty('am');
       expect(res.body.captions.am.reviewStatus).toBe('machine-generated');
-      expect(res.body.captions.am.url).toMatch(/\/uploads\/captions\/demo_lesson_am\.vtt$/);
+      expect(res.body.captions.am.url).toMatch(/\/(assets\/demo|uploads\/captions)\/demo_lesson_am\.vtt$/);
     });
 
     it('GET /api/public/videos/:id/offlinepack downloads zip bundle with audio, transcript, lesson.html, brf', async () => {

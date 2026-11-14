@@ -18,19 +18,21 @@ async function seedDemoLesson() {
       progress: 100,
       step: 'Transcription complete. Human review ready.',
       error: null,
-      audioUrl: '/uploads/audio/demo_lesson_64k.mp3',
-      signVideoUrl: '/uploads/sign/demo_lesson_sign.mp4',
+      audioUrl: '/assets/demo/demo_lesson_64k.mp3',
+      signVideoUrl: '/assets/demo/demo_lesson_sign.mp4',
+      brailleUrl: '/assets/demo/demo_lesson.brf',
+      braillePath: path.resolve(__dirname, '../assets/demo/demo_lesson.brf'),
       captions: {
         en: {
-          vttPath: path.resolve(__dirname, '../../uploads/captions/demo_lesson_en.vtt'),
-          vttUrl: '/uploads/captions/demo_lesson_en.vtt',
+          vttPath: path.resolve(__dirname, '../assets/demo/demo_lesson_en.vtt'),
+          vttUrl: '/assets/demo/demo_lesson_en.vtt',
           status: 'human-reviewed',
           reviewStatus: 'human-reviewed',
           approvedAt: new Date()
         },
         am: {
-          vttPath: path.resolve(__dirname, '../../uploads/captions/demo_lesson_am.vtt'),
-          vttUrl: '/uploads/captions/demo_lesson_am.vtt',
+          vttPath: path.resolve(__dirname, '../assets/demo/demo_lesson_am.vtt'),
+          vttUrl: '/assets/demo/demo_lesson_am.vtt',
           status: 'machine-generated',
           reviewStatus: 'machine-generated'
         }
