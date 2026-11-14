@@ -50,17 +50,6 @@ function probeVideo(inputPath) {
             return reject(new Error('The uploaded file is empty (0 bytes). Please upload a valid video.'));
           }
 
-          // If both fail and file is not obviously corrupt in a test environment, check if mock/test bytes
-          const header = Buffer.alloc(12);
-          const fd = fs.openSync(inputPath, 'r');
-          fs.readSync(fd, header, 0, 12, 0);
-          fs.closeSync(fd);
-
-          const isMp4 = header.toString('utf8', 4, 8) === 'ftyp';
-          if (isMp4) {
-            return resolve({ valid: true });
-          }
-
           reject(new Error('The uploaded video file appears to be corrupted or in an unsupported format. Please try re-encoding or exporting as MP4/WebM.'));
         });
       }
@@ -144,3 +133,4 @@ module.exports = {
   extractWav,
   compressToMp3
 };
+

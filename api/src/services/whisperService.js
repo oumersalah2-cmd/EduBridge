@@ -39,19 +39,6 @@ function transcribeAudio(wavPath, options = {}) {
       },
       (err, stdout, stderr) => {
         if (err) {
-          // If faster-whisper is not installed in the current environment
-          if (stderr && stderr.includes('faster-whisper') && stderr.includes('not installed')) {
-            console.warn('faster-whisper is not installed in current Python environment. Generating fallback transcript.');
-            return resolve({
-              segments: [
-                { start: 0.0, end: 3.5, text: "Welcome to this accessible educational lesson." },
-                { start: 4.0, end: 8.0, text: "This transcript was generated through the EduBridge audio pipeline." }
-              ],
-              duration: 8.0,
-              fallback: true
-            });
-          }
-
           const errorMsg = stderr ? stderr.trim().split('\n').pop() : err.message;
           return reject(new Error(`Speech transcription failed: ${errorMsg}`));
         }
@@ -70,3 +57,4 @@ function transcribeAudio(wavPath, options = {}) {
 module.exports = {
   transcribeAudio
 };
+
