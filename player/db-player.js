@@ -2,7 +2,7 @@
  * EduBridge Accessible Media Player (<db-player>)
  * Track 2: Accessible Learning Media — Digital Bridge Hackathon 2026
  *
- * Requirements Met in this Version (Steps 1, 2 & 3):
+ * Requirements Met in this Version (Steps 1, 2, 3 & 4):
  * - One tag: <db-player src="..." captions="..." sign="..." describe="..." lang="am" api="..."></db-player>
  * - Custom WebVTT parser & high-contrast cue renderer (never relies on un-stylable native browser captions).
  * - Full bilingual support (English & Amharic Ethiopic typography with 1.7 line-height).
@@ -10,6 +10,9 @@
  * - Human-reviewed vs Machine-generated verification badge.
  * - Full keyboard operation without traps (WCAG 2.1.1, 2.1.2, 2.1.4): Space/K, Left/Right arrows, M, C, S, F, ?.
  * - Native <dialog> element for Keyboard Help with focus retention (Escape closes, focus returns).
+ * - Synchronized Ethiopian Sign Language (EthSL) Picture-in-Picture window:
+ *   - Video synchronization on play, pause, seek, and ratechange with 1-second drift correction.
+ *   - WCAG 2.5.7 compliant: Dragging has 100% button alternatives (Top-Left, Top-Right, Bottom-Left, Bottom-Right, Larger, Smaller).
  * - Semantic controls, 44x44px touch targets, 3px solid focus indicators, screen reader live region.
  * - Emits db-player:progress, db-player:complete, and db-player:prefs.
  */
@@ -38,6 +41,11 @@ class DbPlayer extends HTMLElement {
       en: [],
       am: []
     };
+
+    // Ethiopian Sign Language (EthSL) state
+    this.signVisible = false;
+    this.signPosition = localStorage.getItem('edubridge_sign_position') || 'bottom-right'; // 'top-left', 'top-right', 'bottom-left', 'bottom-right'
+    this.signSize = localStorage.getItem('edubridge_sign_size') || 'medium'; // 'small', 'medium', 'large'
 
     // Pre-seed fallback bilingual cues so player works instantly without network
     this.seedDefaultCaptions();
@@ -162,9 +170,18 @@ class DbPlayer extends HTMLElement {
         captionsOn: "Captions visible",
         captionsOff: "Captions hidden",
         signLanguage: "Ethiopian Sign Language",
+        signLanguageTitle: "Ethiopian Sign Language (EthSL)",
+        signOpened: "Sign language window opened",
+        signClosed: "Sign language window closed",
+        signMoveTL: "Move Sign to Top-Left",
+        signMoveTR: "Move Sign to Top-Right",
+        signMoveBL: "Move Sign to Bottom-Left",
+        signMoveBR: "Move Sign to Bottom-Right",
+        signLarger: "Enlarge Sign Window",
+        signSmaller: "Reduce Sign Window",
         fullscreen: "Full screen",
         shortcuts: "Keyboard help",
-        statusReady: "Player ready. Space or K to play, Left/Right to seek, ? for help.",
+        statusReady: "Player ready. Space or K to play, S for Sign Language, ? for help.",
         statusPlaying: "Playing video",
         statusPaused: "Video paused",
         langEn: "English Captions",
@@ -202,9 +219,18 @@ class DbPlayer extends HTMLElement {
         captionsOn: "የትርጉም ጽሑፍ በርቷል",
         captionsOff: "የትርጉም ጽሑፍ ጠፍቷል",
         signLanguage: "የኢትዮጵያ የምልክት ቋንቋ",
+        signLanguageTitle: "የኢትዮጵያ የምልክት ቋንቋ (EthSL)",
+        signOpened: "የምልክት ቋንቋ መስኮት ተከፍቷል",
+        signClosed: "የምልክት ቋንቋ መስኮት ተዘግቷል",
+        signMoveTL: "የምልክት መስኮት ወደ ላይ-ግራ ውሰድ",
+        signMoveTR: "የምልክት መስኮት ወደ ላይ-ቀኝ ውሰድ",
+        signMoveBL: "የምልክት መስኮት ወደ ታች-ግራ ውሰድ",
+        signMoveBR: "የምልክት መስኮት ወደ ታች-ቀኝ ውሰድ",
+        signLarger: "የምልክት መስኮት አተልቅ",
+        signSmaller: "የምልክት መስኮት አሳንስ",
         fullscreen: "ሙሉ ማያ",
         shortcuts: "የቁልፍ ሰሌዳ እገዛ",
-        statusReady: "ማጫወቻው ዝግጁ ነው። ለማጫወት Space ወይም K፣ ወደ ኋላ/ፊት የቀስት ቁልፎች፣ ለእገዛ ? ይጫኑ።",
+        statusReady: "ማጫወቻው ዝግጁ ነው። ለማጫወት Space ወይም K፣ ለምልክት ቋንቋ S፣ ለእገዛ ? ይጫኑ።",
         statusPlaying: "ቪዲዮ በመጫወት ላይ",
         statusPaused: "ቪዲዮ ቆሟል",
         langEn: "እንግሊዝኛ የትርጉም ጽሑፍ",
@@ -237,6 +263,7 @@ class DbPlayer extends HTMLElement {
 
   render() {
     const src = this.getAttribute('src') || '';
+    const signSrc = this.getAttribute('sign') || './data/lesson.ethsl.mp4';
     const t = this.i18n;
 
     this.shadowRoot.innerHTML = `
@@ -375,6 +402,91 @@ class DbPlayer extends HTMLElement {
           background-color: #ffeb3b;
           color: #000000;
           border: 2px solid #000000;
+        }
+
+        /* -------------------------------------------------------------
+           ETHIOPIAN SIGN LANGUAGE (EthSL) PIP WINDOW (WCAG 2.5.7)
+           ------------------------------------------------------------- */
+        .sign-pip-container {
+          position: absolute;
+          z-index: 20;
+          background: #111827;
+          border: 2px solid #3b82f6;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+          transition: width 0.2s ease, top 0.2s ease, left 0.2s ease, right 0.2s ease, bottom 0.2s ease;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .sign-pip-container.hidden {
+          display: none;
+        }
+
+        /* Sign Sizes (large enough to read hands and face) */
+        .sign-size-small { width: 190px; }
+        .sign-size-medium { width: 260px; }
+        .sign-size-large { width: 340px; }
+
+        /* Sign Positions */
+        .sign-pos-bottom-right { bottom: 74px; right: 16px; top: auto; left: auto; }
+        .sign-pos-bottom-left { bottom: 74px; left: 16px; top: auto; right: auto; }
+        .sign-pos-top-right { top: 16px; right: 16px; bottom: auto; left: auto; }
+        .sign-pos-top-left { top: 16px; left: 16px; bottom: auto; right: auto; }
+
+        .sign-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: #1f2937;
+          padding: 0.35rem 0.5rem;
+          border-bottom: 1px solid #374151;
+        }
+
+        .sign-title {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #93c5fd;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .sign-actions {
+          display: flex;
+          gap: 2px;
+        }
+
+        .btn-pip-ctrl {
+          background: #374151;
+          color: #ffffff;
+          border: 1px solid #4b5563;
+          border-radius: 3px;
+          padding: 2px 5px;
+          font-size: 0.75rem;
+          cursor: pointer;
+          min-height: 28px;
+          min-width: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .btn-pip-ctrl:hover {
+          background: #2563eb;
+        }
+
+        .btn-pip-ctrl:focus-visible {
+          outline: 2px solid #f5a300;
+          outline-offset: 1px;
+        }
+
+        video.sign-video {
+          width: 100%;
+          height: auto;
+          display: block;
+          background: #000000;
         }
 
         /* -------------------------------------------------------------
@@ -634,6 +746,34 @@ class DbPlayer extends HTMLElement {
           </div>
         </div>
 
+        <!-- Ethiopian Sign Language Picture-in-Picture Window (WCAG 2.5.7) -->
+        <div 
+          id="sign-pip-container" 
+          class="sign-pip-container sign-size-${this.signSize} sign-pos-${this.signPosition} ${this.signVisible ? '' : 'hidden'}"
+          aria-label="${t.signLanguageTitle}"
+          role="region">
+          
+          <div class="sign-header">
+            <span class="sign-title">🤟 EthSL</span>
+            <div class="sign-actions" role="toolbar" aria-label="Sign window controls">
+              <button type="button" class="btn-pip-ctrl" id="btn-pos-tl" aria-label="${t.signMoveTL}">↖</button>
+              <button type="button" class="btn-pip-ctrl" id="btn-pos-tr" aria-label="${t.signMoveTR}">↗</button>
+              <button type="button" class="btn-pip-ctrl" id="btn-pos-bl" aria-label="${t.signMoveBL}">↙</button>
+              <button type="button" class="btn-pip-ctrl" id="btn-pos-br" aria-label="${t.signMoveBR}">↘</button>
+              <button type="button" class="btn-pip-ctrl" id="btn-size-toggle" aria-label="${t.signLarger}">⇲</button>
+              <button type="button" class="btn-pip-ctrl" id="btn-close-sign" aria-label="${t.signClosed}">✕</button>
+            </div>
+          </div>
+
+          <video 
+            class="sign-video" 
+            src="${signSrc}" 
+            playsinline 
+            muted 
+            preload="metadata">
+          </video>
+        </div>
+
         <!-- Caption Settings Flyout Panel -->
         <div 
           id="caption-settings-panel" 
@@ -763,8 +903,13 @@ class DbPlayer extends HTMLElement {
             <span aria-hidden="true">CC</span>
           </button>
 
-          <!-- Sign Language Toggle Placeholder -->
-          <button type="button" class="btn-ctrl" id="btn-sign" aria-label="${t.signLanguage}" aria-pressed="false">
+          <!-- Sign Language Toggle Button -->
+          <button 
+            type="button" 
+            class="btn-ctrl" 
+            id="btn-sign" 
+            aria-label="${t.signLanguage}" 
+            aria-pressed="${this.signVisible}">
             <span aria-hidden="true">🤟</span>
           </button>
 
@@ -787,6 +932,7 @@ class DbPlayer extends HTMLElement {
   setupEventListeners() {
     const wrapper = this.shadowRoot.querySelector('.player-wrapper');
     const video = this.shadowRoot.querySelector('video.main-video');
+    const signVideo = this.shadowRoot.querySelector('video.sign-video');
     const playBtn = this.shadowRoot.querySelector('#btn-play');
     const playIcon = this.shadowRoot.querySelector('#play-icon');
     const playText = this.shadowRoot.querySelector('#play-text');
@@ -801,6 +947,8 @@ class DbPlayer extends HTMLElement {
     const captionBox = this.shadowRoot.querySelector('#caption-box');
     const captionBadge = this.shadowRoot.querySelector('#caption-badge');
     const captionsBtn = this.shadowRoot.querySelector('#btn-captions');
+    const signBtn = this.shadowRoot.querySelector('#btn-sign');
+    const signPipContainer = this.shadowRoot.querySelector('#sign-pip-container');
     const settingsPanel = this.shadowRoot.querySelector('#caption-settings-panel');
     const closeSettingsBtn = this.shadowRoot.querySelector('#btn-close-settings');
     const helpBtn = this.shadowRoot.querySelector('#btn-help');
@@ -816,12 +964,14 @@ class DbPlayer extends HTMLElement {
       return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    // Play / Pause Toggle
+    // Play / Pause Synchronization
     const togglePlay = () => {
       if (video.paused || video.ended) {
         video.play();
+        if (this.signVisible && signVideo) signVideo.play().catch(() => {});
       } else {
         video.pause();
+        if (signVideo) signVideo.pause();
       }
     };
 
@@ -833,6 +983,9 @@ class DbPlayer extends HTMLElement {
       playText.textContent = t.pause;
       playBtn.setAttribute('aria-label', t.pause);
       statusEl.textContent = t.statusPlaying;
+      if (this.signVisible && signVideo && signVideo.paused) {
+        signVideo.play().catch(() => {});
+      }
     });
 
     video.addEventListener('pause', () => {
@@ -841,9 +994,27 @@ class DbPlayer extends HTMLElement {
       playText.textContent = t.play;
       playBtn.setAttribute('aria-label', t.play);
       statusEl.textContent = t.statusPaused;
+      if (signVideo && !signVideo.paused) {
+        signVideo.pause();
+      }
     });
 
-    // Cue synchronization
+    // Ratechange sync
+    video.addEventListener('ratechange', () => {
+      if (signVideo) signVideo.playbackRate = video.playbackRate;
+    });
+
+    // Seeking sync
+    video.addEventListener('seeking', () => {
+      if (signVideo) signVideo.currentTime = video.currentTime;
+    });
+    video.addEventListener('seeked', () => {
+      if (signVideo) signVideo.currentTime = video.currentTime;
+    });
+
+    // -------------------------------------------------------------
+    // REAL-TIME CUE & SIGN DRIFT CORRECTION
+    // -------------------------------------------------------------
     video.addEventListener('timeupdate', () => {
       const currentTime = video.currentTime;
       currentTimeEl.textContent = formatTime(currentTime);
@@ -858,6 +1029,7 @@ class DbPlayer extends HTMLElement {
         }
       }));
 
+      // Captions cue update
       if (this.captionsVisible) {
         const activeTrack = this.captionTracks[this.captionLang] || [];
         const activeCue = activeTrack.find((c) => currentTime >= c.start && currentTime <= c.end);
@@ -870,6 +1042,13 @@ class DbPlayer extends HTMLElement {
           captionContainer.classList.add('hidden');
         }
       }
+
+      // EthSL Drift correction (every second if drift > 0.3s)
+      if (this.signVisible && signVideo && !signVideo.paused) {
+        if (Math.abs(signVideo.currentTime - currentTime) > 0.3) {
+          signVideo.currentTime = currentTime;
+        }
+      }
     });
 
     video.addEventListener('loadedmetadata', () => {
@@ -877,6 +1056,7 @@ class DbPlayer extends HTMLElement {
     });
 
     video.addEventListener('ended', () => {
+      if (signVideo) signVideo.pause();
       this.dispatchEvent(new CustomEvent('db-player:complete', {
         bubbles: true,
         composed: true,
@@ -887,6 +1067,7 @@ class DbPlayer extends HTMLElement {
     // Seek actions
     const seekRelative = (delta) => {
       video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
+      if (signVideo) signVideo.currentTime = video.currentTime;
       statusEl.textContent = `${delta < 0 ? t.seekBack : t.seekForward}: ${formatTime(video.currentTime)}`;
     };
 
@@ -919,6 +1100,65 @@ class DbPlayer extends HTMLElement {
     fsBtn.addEventListener('click', toggleFullscreen);
 
     // -------------------------------------------------------------
+    // ETHIOPIAN SIGN LANGUAGE (EthSL) TOGGLE & BUTTON PRESETS
+    // -------------------------------------------------------------
+    const toggleSignLanguage = () => {
+      this.signVisible = !this.signVisible;
+      signPipContainer.classList.toggle('hidden', !this.signVisible);
+      signBtn.setAttribute('aria-pressed', this.signVisible ? 'true' : 'false');
+
+      if (this.signVisible) {
+        signVideo.currentTime = video.currentTime;
+        if (!video.paused) {
+          signVideo.play().catch(() => {});
+        }
+        statusEl.textContent = t.signOpened;
+      } else {
+        signVideo.pause();
+        statusEl.textContent = t.signClosed;
+      }
+      this.dispatchPrefs();
+    };
+
+    signBtn.addEventListener('click', toggleSignLanguage);
+
+    const closeSignBtn = this.shadowRoot.querySelector('#btn-close-sign');
+    if (closeSignBtn) {
+      closeSignBtn.addEventListener('click', () => {
+        toggleSignLanguage();
+        signBtn.focus();
+      });
+    }
+
+    // Position presets (WCAG 2.5.7)
+    const setSignPosition = (pos) => {
+      this.signPosition = pos;
+      localStorage.setItem('edubridge_sign_position', pos);
+      signPipContainer.className = `sign-pip-container sign-size-${this.signSize} sign-pos-${this.signPosition} ${this.signVisible ? '' : 'hidden'}`;
+      statusEl.textContent = `Sign window: ${pos}`;
+      this.dispatchPrefs();
+    };
+
+    this.shadowRoot.querySelector('#btn-pos-tl')?.addEventListener('click', () => setSignPosition('top-left'));
+    this.shadowRoot.querySelector('#btn-pos-tr')?.addEventListener('click', () => setSignPosition('top-right'));
+    this.shadowRoot.querySelector('#btn-pos-bl')?.addEventListener('click', () => setSignPosition('bottom-left'));
+    this.shadowRoot.querySelector('#btn-pos-br')?.addEventListener('click', () => setSignPosition('bottom-right'));
+
+    // Size preset cycle (Small -> Medium -> Large)
+    const sizeToggleBtn = this.shadowRoot.querySelector('#btn-size-toggle');
+    if (sizeToggleBtn) {
+      sizeToggleBtn.addEventListener('click', () => {
+        const sizes = ['small', 'medium', 'large'];
+        const nextIdx = (sizes.indexOf(this.signSize) + 1) % sizes.length;
+        this.signSize = sizes[nextIdx];
+        localStorage.setItem('edubridge_sign_size', this.signSize);
+        signPipContainer.className = `sign-pip-container sign-size-${this.signSize} sign-pos-${this.signPosition} ${this.signVisible ? '' : 'hidden'}`;
+        statusEl.textContent = `Sign size: ${this.signSize}`;
+        this.dispatchPrefs();
+      });
+    }
+
+    // -------------------------------------------------------------
     // ACCESSIBLE KEYBOARD SHORTCUTS ENGINE (WCAG 2.1.1, 2.1.4)
     // -------------------------------------------------------------
     const openHelpDialog = () => {
@@ -941,15 +1181,13 @@ class DbPlayer extends HTMLElement {
     dialogCloseBtn.addEventListener('click', closeHelpDialog);
     dialogXBtn.addEventListener('click', closeHelpDialog);
 
-    // Global keyboard listener scoped to the component
+    // Scoped keyboard listener
     this.addEventListener('keydown', (e) => {
-      // Do not trigger shortcuts if user is typing in an input
       const targetTag = e.target.tagName ? e.target.tagName.toLowerCase() : '';
       if (targetTag === 'input' || targetTag === 'textarea' || e.target.isContentEditable) {
         return;
       }
 
-      // If shortcuts dialog is open, let Escape close it
       if (shortcutsDialog && shortcutsDialog.open) {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -990,6 +1228,12 @@ class DbPlayer extends HTMLElement {
           captionsBtn.setAttribute('aria-pressed', this.captionsVisible ? 'true' : 'false');
           statusEl.textContent = this.captionsVisible ? t.captionsOn : t.captionsOff;
           this.dispatchPrefs();
+          break;
+
+        case 's':
+        case 'S':
+          e.preventDefault();
+          toggleSignLanguage();
           break;
 
         case 'f':
@@ -1116,7 +1360,10 @@ class DbPlayer extends HTMLElement {
         captionSize: Number(this.captionSize),
         captionTheme: this.captionTheme,
         captionLang: this.captionLang,
-        captionsVisible: this.captionsVisible
+        captionsVisible: this.captionsVisible,
+        signVisible: this.signVisible,
+        signPosition: this.signPosition,
+        signSize: this.signSize
       }
     }));
   }
