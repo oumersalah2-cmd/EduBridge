@@ -194,6 +194,47 @@ describe('Job 2: Phase B Core Pipeline Tests (MOCK_API=false)', () => {
       expect(corruptVideoRecord.progress).toBe(0);
       expect(corruptVideoRecord.step).toContain('Processing failed');
       expect(corruptVideoRecord.error).toContain('corrupted');
+
+      // Technical terms must not be in the plain-language error
+      expect(corruptVideoRecord.error).not.toContain('ffprobe');
+      expect(corruptVideoRecord.error).not.toContain('Error:');
+      expect(corruptVideoRecord.error).not.toContain('code');
+    });
+
+    it('returns a clean plain-language error with no technical jargon when transcription fails', async () => {
+      const failedId = '507f191e810c19729de860ec';
+      // Simulate underlying runtime / missing package error from whisper service
+      whisperSpy.mockRejectedValueOnce(
+        new Error("Command failed: python3 scripts/transcribe.py. ModuleNotFoundError: No module named 'faster_whisper'. Error: package missing.")
+      );
+
+      const failedVideoRecord = {
+        _id: failedId,
+        title: 'Transcription Failure Test',
+        sourcePath: validDummyVideo,
+        status: 'uploaded',
+        progress: 0,
+        save: jest.fn().mockResolvedValue(true)
+      };
+
+      jest.spyOn(Video, 'findById').mockResolvedValue(failedVideoRecord);
+
+      await pipelineQueue.processVideo(failedId);
+
+      expect(failedVideoRecord.status).toBe('failed');
+      expect(failedVideoRecord.progress).toBe(0);
+      expect(failedVideoRecord.step).toBe('Processing failed: Speech recognition failed.');
+      expect(typeof failedVideoRecord.error).toBe('string');
+      expect(failedVideoRecord.error.length).toBeGreaterThan(0);
+
+      // Plain-language requirement: MUST NOT leak technical details, language, or stack terms
+      const forbiddenTerms = ['package', 'Python', 'python', 'Error:', 'ModuleNotFoundError', 'traceback', 'stderr', 'spawn', 'child_process'];
+      forbiddenTerms.forEach((term) => {
+        expect(failedVideoRecord.error).not.toContain(term);
+      });
+
+      // Accessible wording check
+      expect(failedVideoRecord.error).toContain('Automatic captioning could not be completed');
     });
   });
 

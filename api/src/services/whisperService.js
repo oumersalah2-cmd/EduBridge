@@ -39,15 +39,16 @@ function transcribeAudio(wavPath, options = {}) {
       },
       (err, stdout, stderr) => {
         if (err) {
-          const errorMsg = stderr ? stderr.trim().split('\n').pop() : err.message;
-          return reject(new Error(`Speech transcription failed: ${errorMsg}`));
+          console.error('[WhisperService] Technical transcription error:', stderr || err.message);
+          return reject(new Error('Automatic captioning could not be completed for this audio.'));
         }
 
         try {
           const parsed = JSON.parse(stdout);
           resolve(parsed);
         } catch (parseErr) {
-          reject(new Error('Failed to parse speech transcription output. Please retry processing.'));
+          console.error('[WhisperService] JSON parse error:', parseErr.message, stdout);
+          reject(new Error('Failed to process speech recognition results.'));
         }
       }
     );

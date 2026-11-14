@@ -3,18 +3,24 @@ const fs = require('fs');
 const pipelineQueue = require('../src/services/pipelineQueue');
 
 async function runCheckpoint() {
-  console.log('=== CHECKPOINT 2: Core Video & Audio Pipeline Execution ===\n');
+  console.log('=== Pipeline Execution (Dev / Verification Runner) ===\n');
   process.env.MOCK_API = 'false';
 
-  const videoPath = path.resolve(__dirname, '../../uploads/videos/test-lesson.mp4');
+  const targetArg = process.argv[2];
+  if (!targetArg) {
+    console.error('Usage: node api/scripts/checkpoint2-runner.js <path-to-video.mp4>');
+    process.exit(1);
+  }
+
+  const videoPath = path.resolve(process.cwd(), targetArg);
   if (!fs.existsSync(videoPath)) {
-    console.error('Test video not found at:', videoPath);
+    console.error(`Error: Video file not found at "${videoPath}".`);
     process.exit(1);
   }
 
   const videoRecord = {
-    _id: 'checkpoint2-test-lesson',
-    title: 'Accessible Renewable Energy & Photovoltaics (Real Video Test)',
+    _id: 'dev-pipeline-test-lesson',
+    title: path.parse(videoPath).name || 'Developer Pipeline Test',
     sourcePath: videoPath,
     status: 'uploaded',
     progress: 0,

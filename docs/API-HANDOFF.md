@@ -214,3 +214,15 @@ curl -s http://localhost:4000/api/jobs
 curl -s http://localhost:4000/api/jobs/job-eth-01
 ```
 
+---
+
+## 8. Developer CLI Scripts
+
+### Pipeline Verification Runner (`checkpoint2-runner.js`)
+A dev-only script to test and verify the video processing queue and audio pipeline end-to-end without requiring the Studio UI:
+```bash
+node api/scripts/checkpoint2-runner.js <path-to-video.mp4>
+```
+Takes a target video path as a CLI argument, validates the container with `ffprobe`, extracts 16 kHz WAV and 64 kbps mono MP3 with `ffmpeg`, transcribes speech with `faster-whisper`, formats non-overlapping WebVTT cues, and prints status steps and file sizes. If any tool is unavailable, it fails with a plain-language error message.
+
+

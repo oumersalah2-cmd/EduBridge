@@ -90,11 +90,12 @@ class PipelineQueue {
     try {
       await ffmpegService.probeVideo(sourcePath);
     } catch (probeErr) {
+      console.error('[Pipeline] Video probe failed:', probeErr.message);
       await this.updateVideoState(video, {
         status: 'failed',
         progress: 0,
         step: 'Processing failed: Unsupported or corrupted video file.',
-        error: probeErr.message || 'The video file appears to be corrupted or in an unsupported format.'
+        error: 'The uploaded video file appears to be corrupted or in an unsupported format. Please try re-encoding or exporting as MP4, WebM, or MOV.'
       });
       return;
     }
@@ -113,11 +114,12 @@ class PipelineQueue {
       await ffmpegService.extractWav(sourcePath, wavPath);
       video.wavPath = wavPath;
     } catch (wavErr) {
+      console.error('[Pipeline] Audio extraction failed:', wavErr.message);
       await this.updateVideoState(video, {
         status: 'failed',
         progress: 0,
         step: 'Processing failed: Could not extract audio.',
-        error: wavErr.message || 'Failed to extract audio track from video.'
+        error: 'We could not extract an audio track from this video. Please make sure the video includes an audio stream.'
       });
       return;
     }
@@ -138,11 +140,12 @@ class PipelineQueue {
       video.audioPath = mp3Path;
       video.audioUrl = `/uploads/audio/${mp3Filename}`;
     } catch (mp3Err) {
+      console.error('[Pipeline] Audio compression failed:', mp3Err.message);
       await this.updateVideoState(video, {
         status: 'failed',
         progress: 0,
         step: 'Processing failed: Could not compress audio.',
-        error: mp3Err.message || 'Failed to compress audio track.'
+        error: 'We could not compress the audio for slow connections. Please try uploading the video again.'
       });
       return;
     }
@@ -161,11 +164,12 @@ class PipelineQueue {
         language: 'en'
       });
     } catch (whisperErr) {
+      console.error('[Pipeline] Speech recognition failed:', whisperErr.message);
       await this.updateVideoState(video, {
         status: 'failed',
         progress: 0,
         step: 'Processing failed: Speech recognition failed.',
-        error: whisperErr.message || 'Automatic speech recognition failed on the extracted audio.'
+        error: 'Automatic captioning could not be completed for this video. Please verify the speech is audible and try again.'
       });
       return;
     }
