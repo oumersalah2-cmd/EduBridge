@@ -33,21 +33,18 @@ router.get('/', async (req, res, next) => {
 
   try {
     const jobs = await Job.find().sort({ createdAt: -1 });
-    if (!jobs || jobs.length === 0) {
-      return res.json(getMockJobs(req));
-    }
     return res.json(jobs);
   } catch (err) {
-    return res.json(getMockJobs(req));
+    next(err);
   }
 });
 
 // GET /api/jobs/:id - Get specific job card
 router.get('/:id', async (req, res, next) => {
   const { id } = req.params;
-  const mockJobs = getMockJobs(req);
 
   if (process.env.MOCK_API === 'true') {
+    const mockJobs = getMockJobs(req);
     const job = mockJobs.find((j) => j.id === id || j._id?.toString() === id);
     if (!job) {
       return res.status(404).json({
@@ -61,9 +58,8 @@ router.get('/:id', async (req, res, next) => {
     let job = null;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       job = await Job.findById(id);
-    }
-    if (!job) {
-      job = mockJobs.find((j) => j.id === id);
+    } else {
+      job = await Job.findOne({ $or: [{ id }, { customId: id }, { 'jsonLd.identifier': id }] });
     }
 
     if (!job) {

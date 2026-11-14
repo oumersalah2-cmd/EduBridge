@@ -3,14 +3,36 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env'
 const mongoose = require('mongoose');
 const path = require('path');
 const Video = require('../src/models/Video');
+const Job = require('../src/models/Job');
+const { getMockJobs } = require('../src/routes/mockData');
 
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/edubridge';
+
+async function seedDemoJobs() {
+  const jobs = getMockJobs();
+  for (const jobData of jobs) {
+    const existing = await Job.findOne({ title: jobData.title, employer: jobData.employer });
+    if (existing) {
+      Object.assign(existing, { ...jobData, _id: existing._id });
+      await existing.save();
+    } else {
+      const newJob = new Job({ ...jobData, _id: undefined });
+      await newJob.save();
+    }
+  }
+  console.log(`Seeded ${jobs.length} accessible Ethiopian job postings into MongoDB.`);
+}
 
 async function seedDemoLesson() {
   try {
     console.log(`Connecting to MongoDB at ${MONGO_URL}...`);
     await mongoose.connect(MONGO_URL, { serverSelectionTimeoutMS: 5000 });
     console.log('Connected to MongoDB.');
+
+    // 1. Seed Accessible Jobs
+    await seedDemoJobs();
+
+    // 2. Seed Demo Lesson Video
 
     const demoData = {
       title: 'Accessible Renewable Energy & Photovoltaics (Demo Lesson)',
@@ -71,4 +93,4 @@ if (require.main === module) {
   seedDemoLesson();
 }
 
-module.exports = { seedDemoLesson };
+module.exports = { seedDemoLesson, seedDemoJobs };
