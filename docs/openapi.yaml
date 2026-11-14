@@ -2,13 +2,15 @@ openapi: 3.0.3
 info:
   title: EduBridge Accessible API
   description: >-
-    Backend API for EduBridge, an open-source accessible learning media and live classroom platform.
-    Designed for low-bandwidth 3G, offline distribution, and diverse accessibility needs.
+    Complete API specification and single source of truth for EduBridge.
+    Powers the Teacher Studio (Member 2), Accessible Player & Job Card (Member 3),
+    and Partner Integrations. Designed for low-bandwidth 3G, offline distribution,
+    and universal accessibility (WCAG 2.2 AA).
   version: 1.0.0
 
 servers:
   - url: http://localhost:4000
-    description: Local development / LAN server
+    description: Local Development / LAN Mode
 
 components:
   securitySchemes:
@@ -16,7 +18,7 @@ components:
       type: apiKey
       in: header
       name: X-Studio-Key
-      description: Secret key required for teacher and studio write operations
+      description: Secret key required for teacher and studio write operations.
 
   schemas:
     ErrorResponse:
@@ -26,7 +28,7 @@ components:
       properties:
         error:
           type: string
-          description: Accessible plain-language explanation of what went wrong
+          description: Accessible plain-language explanation of the issue (no stack traces or jargon).
           example: "Unauthorized: Invalid or missing X-Studio-Key header. Access to studio write operations requires a valid key."
 
     HealthResponse:
@@ -38,6 +40,20 @@ components:
           type: string
           example: "ok"
 
+    VideoCreatedResponse:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          example: "mock-vid-demo-01"
+        status:
+          type: string
+          enum: [uploaded, live, processing, review, published, failed]
+          example: "uploaded"
+
     VideoStatusResponse:
       type: object
       required:
@@ -48,19 +64,20 @@ components:
       properties:
         id:
           type: string
-          example: "6735e0fa820129f1092a11b2"
+          example: "mock-vid-demo-01"
         status:
           type: string
           enum: [uploaded, live, processing, review, published, failed]
-          example: "review"
+          example: "processing"
         progress:
           type: number
           minimum: 0
           maximum: 100
-          example: 100
+          example: 40
         step:
           type: string
-          example: "Transcription complete. Human review ready."
+          description: Plain-language status suitable for aria-live screen reader announcements.
+          example: "Extracting 16 kHz audio for transcription"
         error:
           type: string
           nullable: true
@@ -68,14 +85,88 @@ components:
 
     CaptionTrack:
       type: object
+      required:
+        - url
+        - reviewStatus
       properties:
         url:
           type: string
-          example: "/uploads/captions/6735e0fa820129f1092a11b2_en.vtt"
+          example: "/uploads/captions/demo_lesson_en.vtt"
+        reviewStatus:
+          type: string
+          enum: [human-reviewed, machine-generated]
+          example: "human-reviewed"
+
+    CaptionEditResponse:
+      type: object
+      required:
+        - id
+        - lang
+        - status
+        - reviewStatus
+        - approved
+      properties:
+        id:
+          type: string
+          example: "mock-vid-demo-01"
+        lang:
+          type: string
+          enum: [en, am, om]
+          example: "en"
         status:
           type: string
-          enum: [machine-generated, human-reviewed]
+          example: "saved"
+        reviewStatus:
+          type: string
+          enum: [human-reviewed, machine-generated]
+          example: "machine-generated"
+        approved:
+          type: boolean
+          example: false
+
+    CaptionApproveResponse:
+      type: object
+      required:
+        - id
+        - lang
+        - reviewStatus
+        - approved
+      properties:
+        id:
+          type: string
+          example: "mock-vid-demo-01"
+        lang:
+          type: string
+          enum: [en, am, om]
+          example: "en"
+        reviewStatus:
+          type: string
+          enum: [human-reviewed, machine-generated]
           example: "human-reviewed"
+        approved:
+          type: boolean
+          example: true
+
+    PublishResponse:
+      type: object
+      required:
+        - status
+        - embedScript
+        - embedIframe
+        - offlinePackUrl
+      properties:
+        status:
+          type: string
+          example: "published"
+        embedScript:
+          type: string
+          example: '<script src="http://localhost:4000/player/embed.js" data-video-id="mock-vid-demo-01"></script>'
+        embedIframe:
+          type: string
+          example: '<iframe src="http://localhost:4000/player/index.html?video=mock-vid-demo-01" title="EduBridge Accessible Lesson Player" width="100%" height="450" frameborder="0" allowfullscreen></iframe>'
+        offlinePackUrl:
+          type: string
+          example: "/api/public/videos/mock-vid-demo-01/offlinepack"
 
     PublicVideoResponse:
       type: object
@@ -84,24 +175,29 @@ components:
         - title
         - status
         - captions
-        - transcriptText
+        - transcript
+        - chatLog
+        - audioUrl
+        - signVideoUrl
+        - offlinePackUrl
+        - brailleUrl
       properties:
         id:
           type: string
-          example: "6735e0fa820129f1092a11b2"
+          example: "mock-video-demo-01"
         title:
           type: string
-          example: "Introduction to Solar Cells"
+          example: "Introduction to Renewable Solar Cells (Demo)"
         status:
           type: string
           example: "published"
         audioUrl:
           type: string
-          example: "/uploads/audio/6735e0fa820129f1092a11b2_64k.mp3"
+          example: "/uploads/audio/demo_lesson_64k.mp3"
         signVideoUrl:
           type: string
           nullable: true
-          example: "/uploads/sign/6735e0fa820129f1092a11b2_sign.mp4"
+          example: "/uploads/sign/demo_lesson_sign.mp4"
         captions:
           type: object
           properties:
@@ -111,11 +207,13 @@ components:
               $ref: '#/components/schemas/CaptionTrack'
             om:
               $ref: '#/components/schemas/CaptionTrack'
-        transcriptText:
+        transcript:
           type: string
-          example: "Welcome to this physics lecture on photovoltaics and renewable energy."
+          description: Complete plain text transcription for accessibility and low-data modes.
+          example: "Welcome to this accessible lesson on renewable energy. Today we will explore solar photovoltaic cells..."
         chatLog:
           type: array
+          description: Log of live classroom interactions (empty for recorded studio lessons).
           items:
             type: object
             properties:
@@ -130,35 +228,10 @@ components:
                 type: number
         offlinePackUrl:
           type: string
-          example: "/api/public/videos/6735e0fa820129f1092a11b2/offlinepack"
+          example: "/api/public/videos/mock-video-demo-01/offlinepack"
         brailleUrl:
           type: string
-          example: "/uploads/braille/6735e0fa820129f1092a11b2.brf"
-
-    PublishResponse:
-      type: object
-      required:
-        - id
-        - status
-        - embedSnippet
-        - iframeSnippet
-        - offlinePackUrl
-      properties:
-        id:
-          type: string
-          example: "6735e0fa820129f1092a11b2"
-        status:
-          type: string
-          example: "published"
-        embedSnippet:
-          type: string
-          example: '<script src="http://localhost:4000/player/embed.js" data-video-id="6735e0fa820129f1092a11b2"></script>'
-        iframeSnippet:
-          type: string
-          example: '<iframe src="http://localhost:4000/player/index.html?video=6735e0fa820129f1092a11b2" title="Accessible Lesson Player" width="100%" height="450"></iframe>'
-        offlinePackUrl:
-          type: string
-          example: "/api/public/videos/6735e0fa820129f1092a11b2/offlinepack"
+          example: "/uploads/braille/demo_lesson.brf"
 
     LiveSessionCreated:
       type: object
@@ -169,14 +242,15 @@ components:
       properties:
         pin:
           type: string
-          example: "482019"
+          pattern: '^[0-9]{6}$'
+          example: "492018"
         joinUrl:
           type: string
-          example: "http://localhost:4000/live/482019"
+          example: "http://localhost:4000/live/492018"
         expiresAt:
           type: string
           format: date-time
-          example: "2026-11-14T16:30:00.000Z"
+          example: "2026-11-14T17:30:00.000Z"
 
     QuestionItem:
       type: object
@@ -187,16 +261,31 @@ components:
       properties:
         id:
           type: string
-          example: "q-7281"
+          example: "q-1700000000-ab"
         text:
           type: string
-          example: "Can you explain the bandgap concept again?"
+          example: "Can you re-explain how the P-N junction works?"
         dismissed:
           type: boolean
           example: false
         createdAt:
           type: string
           format: date-time
+
+    LiveSessionEnded:
+      type: object
+      required:
+        - videoId
+      properties:
+        videoId:
+          type: string
+          example: "recorded-492018"
+        status:
+          type: string
+          example: "ended"
+        offlinePackUrl:
+          type: string
+          example: "/api/public/videos/recorded-492018/offlinepack"
 
     JobCard:
       type: object
@@ -207,7 +296,9 @@ components:
         - location
         - requirements
         - deadline
-        - applyLink
+        - applyUrl
+        - certificateUrl
+        - audioSummaryUrl
         - textSummary
         - jsonLd
       properties:
@@ -219,7 +310,7 @@ components:
           example: "Junior Accessibility QA Tester"
         employer:
           type: string
-          example: "Ethio Telecom Digital Innovation"
+          example: "Ethio Telecom Digital Innovation Hub"
         location:
           type: string
           example: "Addis Ababa, Ethiopia (Hybrid)"
@@ -228,16 +319,16 @@ components:
           items:
             type: string
           example:
-            - "Basic understanding of screen readers (NVDA, TalkBack)"
+            - "Basic understanding of screen readers (NVDA, TalkBack, Orca)"
             - "Testing Web Content Accessibility Guidelines (WCAG 2.2 AA)"
             - "Fluency in Amharic and working English"
         deadline:
           type: string
-          format: date
-          example: "2026-12-15"
-        applyLink:
+          format: date-time
+          example: "2026-12-15T00:00:00.000Z"
+        applyUrl:
           type: string
-          example: "https://example.com/careers/qa-tester"
+          example: "https://careers.ethiotelecom.et/accessibility-qa"
         certificateUrl:
           type: string
           example: "/uploads/certs/accessible-qa-spec.pdf"
@@ -254,8 +345,9 @@ components:
 paths:
   /api/health:
     get:
-      summary: Server Health Check
-      description: Returns ok if the API process is responsive
+      summary: API Health Check
+      description: Returns ok if the server is healthy and responsive.
+      operationId: getHealth
       responses:
         '200':
           description: API is operational
@@ -267,7 +359,8 @@ paths:
   /api/videos:
     post:
       summary: Upload Video for Processing
-      description: Queues an uploaded video for audio extraction, Whisper transcription, and caption generation.
+      description: Uploads video file (and optional sign-language video) and queues it for audio extraction and captioning.
+      operationId: uploadVideo
       security:
         - StudioKeyAuth: []
       requestBody:
@@ -282,33 +375,26 @@ paths:
                 video:
                   type: string
                   format: binary
-                  description: Lesson video file (MP4, WebM, MOV)
+                  description: Lesson video file (MP4, WebM, MOV; up to 200MB)
                 signVideo:
                   type: string
                   format: binary
-                  description: Optional synchronized sign-language video file
+                  description: Optional synchronized sign-language video
       responses:
         '202':
           description: Video accepted and queued for processing
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    example: "6735e0fa820129f1092a11b2"
-                  status:
-                    type: string
-                    example: "uploaded"
+                $ref: '#/components/schemas/VideoCreatedResponse'
         '400':
-          description: Invalid file format or file size exceeded
+          description: Invalid file format or missing video
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized
+          description: Unauthorized - missing or invalid X-Studio-Key header
           content:
             application/json:
               schema:
@@ -317,16 +403,18 @@ paths:
   /api/videos/{id}:
     get:
       summary: Poll Video Processing Progress
-      description: Returns real-time status and human-readable step message for aria-live announcements.
+      description: Returns real-time status and human-readable step message for aria-live screen reader announcements.
+      operationId: getVideoStatus
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
+          example: "mock-vid-demo-01"
       responses:
         '200':
-          description: Video status
+          description: Video processing status
           content:
             application/json:
               schema:
@@ -341,7 +429,8 @@ paths:
   /api/videos/{id}/captions/{lang}:
     put:
       summary: Save Human-Edited WebVTT Captions
-      description: Saves edited WebVTT content for a given language (en, am, om). Resets review approval to unapproved.
+      description: Saves human-edited WebVTT captions for en, am, or om. Resets review approval to unapproved.
+      operationId: saveCaptions
       security:
         - StudioKeyAuth: []
       parameters:
@@ -362,6 +451,7 @@ paths:
           text/vtt:
             schema:
               type: string
+              example: "WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nWelcome to this accessible lesson."
           application/json:
             schema:
               type: object
@@ -372,24 +462,13 @@ paths:
                   type: string
       responses:
         '200':
-          description: WebVTT captions saved successfully
+          description: Captions saved successfully and approval reset
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  lang:
-                    type: string
-                  status:
-                    type: string
-                    example: "saved"
-                  approved:
-                    type: boolean
-                    example: false
+                $ref: '#/components/schemas/CaptionEditResponse'
         '400':
-          description: Invalid WebVTT format
+          description: Invalid WebVTT format (must start with WEBVTT)
           content:
             application/json:
               schema:
@@ -405,6 +484,7 @@ paths:
     post:
       summary: Approve Caption Track
       description: Marks a caption track as human-reviewed.
+      operationId: approveCaptions
       security:
         - StudioKeyAuth: []
       parameters:
@@ -425,15 +505,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  lang:
-                    type: string
-                  approved:
-                    type: boolean
-                    example: true
+                $ref: '#/components/schemas/CaptionApproveResponse'
         '401':
           description: Unauthorized
           content:
@@ -444,7 +516,8 @@ paths:
   /api/videos/{id}/publish:
     post:
       summary: Publish Lesson and Generate 3G Offline Pack
-      description: Transitions status to published, generates offline zip bundle, and returns embed codes.
+      description: Sets status to published, packages the 3G offline bundle, and returns ready-to-use embed snippets.
+      operationId: publishLesson
       security:
         - StudioKeyAuth: []
       parameters:
@@ -455,7 +528,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Published details and embed snippets
+          description: Lesson published with embed snippets
           content:
             application/json:
               schema:
@@ -469,8 +542,9 @@ paths:
 
   /api/public/videos/{id}:
     get:
-      summary: Get Public Lesson Details
+      summary: Get Public Lesson Metadata
       description: Returns accessible lesson details, captions, transcript, and audio link. Rate-limited.
+      operationId: getPublicVideo
       parameters:
         - name: id
           in: path
@@ -479,7 +553,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Lesson public metadata
+          description: Public lesson metadata
           content:
             application/json:
               schema:
@@ -493,8 +567,9 @@ paths:
 
   /api/public/videos/{id}/offlinepack:
     get:
-      summary: Download 3G Offline Bundle
-      description: Returns a compressed ZIP file with audio.mp3, transcript.txt, lesson.html, and lesson.brf.
+      summary: Download 3G Offline ZIP Bundle
+      description: Streams a lightweight ZIP file containing audio.mp3, transcript.txt, zero-dependency lesson.html, and lesson.brf.
+      operationId: downloadOfflinePack
       parameters:
         - name: id
           in: path
@@ -503,14 +578,14 @@ paths:
             type: string
       responses:
         '200':
-          description: 3G Offline ZIP bundle
+          description: 3G Offline Package ZIP
           content:
             application/zip:
               schema:
                 type: string
                 format: binary
         '404':
-          description: Video or bundle not found
+          description: Lesson or package not found
           content:
             application/json:
               schema:
@@ -520,11 +595,12 @@ paths:
     post:
       summary: Create Live Classroom Session
       description: Generates a 6-digit session PIN and initializes the live streaming hub.
+      operationId: createLiveSession
       security:
         - StudioKeyAuth: []
       responses:
         '201':
-          description: Session created
+          description: Session created successfully
           content:
             application/json:
               schema:
@@ -539,13 +615,23 @@ paths:
   /api/live/sessions/{pin}/stream:
     get:
       summary: Connect to Live SSE Event Stream
-      description: Server-Sent Events stream for captions, board updates, question changes, and session termination. Supports Last-Event-ID.
+      description: >-
+        Public unbuffered Server-Sent Events stream for students and learners.
+        Heartbeat comment (`: heartbeat`) sent every 15 seconds.
+        Supports reconnect with `Last-Event-ID`.
+        Event types:
+        - `caption`: `{"text": "...", "isFinal": boolean, "ts": number}`
+        - `board`: `{"id": "...", "text": "...", "ts": number}`
+        - `question-status`: `{"action": "new"|"dismissed", "question": {"id": "...", "text": "..."}}`
+        - `session-ended`: `{"pin": "...", "videoId": "..."}`
+      operationId: connectLiveStream
       parameters:
         - name: pin
           in: path
           required: true
           schema:
             type: string
+            pattern: '^[0-9]{6}$'
         - name: Last-Event-ID
           in: header
           required: false
@@ -553,13 +639,13 @@ paths:
             type: string
       responses:
         '200':
-          description: SSE event stream
+          description: Live SSE event stream
           content:
             text/event-stream:
               schema:
                 type: string
         '404':
-          description: Session not found or expired
+          description: Session PIN not found or expired
           content:
             application/json:
               schema:
@@ -567,8 +653,9 @@ paths:
 
   /api/live/sessions/{pin}/captions:
     post:
-      summary: Broadcast Live Speech Captions
+      summary: Broadcast Teacher Speech Captions
       description: Receives teacher speech results and broadcasts them to all listening students via SSE.
+      operationId: broadcastCaptions
       security:
         - StudioKeyAuth: []
       parameters:
@@ -589,13 +676,16 @@ paths:
               properties:
                 text:
                   type: string
+                  example: "Today we are discussing clean solar power."
                 isFinal:
                   type: boolean
+                  example: true
                 ts:
                   type: number
+                  example: 1700000000000
       responses:
         '200':
-          description: Caption received and broadcast
+          description: Caption broadcasted
           content:
             application/json:
               schema:
@@ -615,6 +705,7 @@ paths:
     post:
       summary: Broadcast Board or Slide Notes
       description: Sends plain-text notes from the teacher podium to all student screens.
+      operationId: broadcastBoard
       security:
         - StudioKeyAuth: []
       parameters:
@@ -634,9 +725,10 @@ paths:
               properties:
                 text:
                   type: string
+                  example: "Formula: E = h * f (Planck's relationship for photon energy)"
       responses:
         '200':
-          description: Board note broadcast
+          description: Board note broadcasted
           content:
             application/json:
               schema:
@@ -645,11 +737,18 @@ paths:
                   status:
                     type: string
                     example: "broadcasted"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/live/sessions/{pin}/questions:
     post:
       summary: Submit Student Question
       description: Public student question submission (max 500 characters, no personal data). Rate limited.
+      operationId: submitQuestion
       parameters:
         - name: pin
           in: path
@@ -668,9 +767,10 @@ paths:
                 text:
                   type: string
                   maxLength: 500
+                  example: "Does humidity affect solar panel output?"
       responses:
         '201':
-          description: Question submitted
+          description: Question submitted and queued
           content:
             application/json:
               schema:
@@ -678,11 +778,18 @@ paths:
                 properties:
                   id:
                     type: string
+                    example: "q-1700000000-ab"
                   status:
                     type: string
                     example: "received"
+        '400':
+          description: Text missing or exceeds 500 characters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
-          description: Too many requests
+          description: Too many requests from this IP
           content:
             application/json:
               schema:
@@ -690,6 +797,7 @@ paths:
     get:
       summary: Get Questions List for Teacher
       description: Returns questions submitted by learners in this live session.
+      operationId: getQuestions
       security:
         - StudioKeyAuth: []
       parameters:
@@ -700,18 +808,25 @@ paths:
             type: string
       responses:
         '200':
-          description: List of questions
+          description: Active questions list
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/QuestionItem'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/live/sessions/{pin}/questions/{qid}:
     delete:
       summary: Dismiss Question
       description: Dismisses or mutes an inappropriate or answered question.
+      operationId: dismissQuestion
       security:
         - StudioKeyAuth: []
       parameters:
@@ -738,11 +853,19 @@ paths:
                     example: "dismissed"
                   id:
                     type: string
+                    example: "q-1700000000-ab"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/live/sessions/{pin}/end:
     post:
       summary: End Live Session and Archive
-      description: Compiles captions into WebVTT, builds offline pack, and produces recorded lesson video ID.
+      description: Compiles captions, archives board notes, and generates a recorded lesson video ID.
+      operationId: endLiveSession
       security:
         - StudioKeyAuth: []
       parameters:
@@ -753,29 +876,26 @@ paths:
             type: string
       responses:
         '200':
-          description: Session ended and archived
+          description: Session ended and archived into a video
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "ended"
-                  recordedVideoId:
-                    type: string
-                    example: "6735e0fa820129f1092a11b2"
-                  offlinePackUrl:
-                    type: string
-                    example: "/api/public/videos/6735e0fa820129f1092a11b2/offlinepack"
+                $ref: '#/components/schemas/LiveSessionEnded'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/jobs:
     get:
       summary: List Accessible Job Opportunities
-      description: Returns list of accessible jobs with schema.org/JobPosting JSON-LD.
+      description: Returns list of accessible jobs with valid schema.org/JobPosting JSON-LD.
+      operationId: listJobs
       responses:
         '200':
-          description: List of jobs
+          description: List of accessible job opportunities
           content:
             application/json:
               schema:
@@ -787,12 +907,14 @@ paths:
     get:
       summary: Get Job Details
       description: Returns specific job opportunity details and schema.org/JobPosting JSON-LD.
+      operationId: getJob
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
+          example: "job-eth-01"
       responses:
         '200':
           description: Job details
@@ -806,3 +928,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/docs:
+    get:
+      summary: Swagger UI Interactive Documentation
+      description: Renders interactive Swagger UI documentation for all EduBridge API routes.
+      responses:
+        '200':
+          description: Interactive HTML documentation
+          content:
+            text/html:
+              schema:
+                type: string

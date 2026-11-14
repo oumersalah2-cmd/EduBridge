@@ -14,7 +14,7 @@ function generatePin() {
 // In-memory fallback sessions store for offline/mock operation
 const inMemorySessions = new Map();
 
-// POST /api/live/sessions - Create live classroom session (Studio Key)
+// POST /api/live/sessions - Create live classroom session (X-Studio-Key)
 router.post('/sessions', studioKey, async (req, res, next) => {
   try {
     let pin = generatePin();
@@ -77,7 +77,6 @@ router.get('/sessions/:pin/stream', async (req, res, next) => {
   const { pin } = req.params;
   const lastEventId = req.header('Last-Event-ID') || req.query.lastEventId;
 
-  // Verify PIN exists
   let exists = inMemorySessions.has(pin);
   if (!exists) {
     try {
@@ -88,6 +87,7 @@ router.get('/sessions/:pin/stream', async (req, res, next) => {
     }
   }
 
+  // In mock mode, allow any 6-digit pin or mock session
   if (!exists && process.env.MOCK_API !== 'true') {
     return res.status(404).json({
       error: `Live session with PIN "${pin}" was not found or has already concluded.`
@@ -97,7 +97,7 @@ router.get('/sessions/:pin/stream', async (req, res, next) => {
   sseHub.addClient(pin, res, lastEventId);
 });
 
-// POST /api/live/sessions/:pin/captions - Teacher speech captions (Studio Key)
+// POST /api/live/sessions/:pin/captions - Teacher speech captions (X-Studio-Key)
 router.post('/sessions/:pin/captions', studioKey, async (req, res, next) => {
   const { pin } = req.params;
   const { text, isFinal, ts } = req.body;
@@ -114,10 +114,8 @@ router.post('/sessions/:pin/captions', studioKey, async (req, res, next) => {
     ts: ts || Date.now()
   };
 
-  // Broadcast to all listening student streams
   sseHub.broadcast(pin, 'caption', captionData);
 
-  // Store final captions
   if (captionData.isFinal) {
     const mem = inMemorySessions.get(pin);
     if (mem) {
@@ -136,7 +134,7 @@ router.post('/sessions/:pin/captions', studioKey, async (req, res, next) => {
   res.json({ status: 'broadcasted' });
 });
 
-// POST /api/live/sessions/:pin/board - Teacher board / slide notes (Studio Key)
+// POST /api/live/sessions/:pin/board - Teacher board / slide notes (X-Studio-Key)
 router.post('/sessions/:pin/board', studioKey, async (req, res, next) => {
   const { pin } = req.params;
   const { text } = req.body;
@@ -188,7 +186,6 @@ router.post('/sessions/:pin/questions', async (req, res, next) => {
     });
   }
 
-  // Sanitize simple HTML tags to avoid markup injection
   const sanitizedText = text.replace(/<[^>]*>/g, '').trim();
 
   const questionId = `q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -212,7 +209,6 @@ router.post('/sessions/:pin/questions', async (req, res, next) => {
     // Mongo offline
   }
 
-  // Broadcast question to teacher and learners
   sseHub.broadcast(pin, 'question-status', {
     action: 'new',
     question: questionData
@@ -224,7 +220,7 @@ router.post('/sessions/:pin/questions', async (req, res, next) => {
   });
 });
 
-// GET /api/live/sessions/:pin/questions - Teacher view of questions (Studio Key)
+// GET /api/live/sessions/:pin/questions - Teacher view of questions (X-Studio-Key)
 router.get('/sessions/:pin/questions', studioKey, async (req, res, next) => {
   const { pin } = req.params;
 
@@ -257,7 +253,7 @@ router.get('/sessions/:pin/questions', studioKey, async (req, res, next) => {
   }
 });
 
-// DELETE /api/live/sessions/:pin/questions/:qid - Teacher dismiss question (Studio Key)
+// DELETE /api/live/sessions/:pin/questions/:qid - Teacher dismiss question (X-Studio-Key)
 router.delete('/sessions/:pin/questions/:qid', studioKey, async (req, res, next) => {
   const { pin, qid } = req.params;
 
@@ -275,7 +271,6 @@ router.delete('/sessions/:pin/questions/:qid', studioKey, async (req, res, next)
     // Mongo offline
   }
 
-  // Notify clients
   sseHub.broadcast(pin, 'question-status', {
     action: 'dismissed',
     questionId: qid
@@ -284,7 +279,7 @@ router.delete('/sessions/:pin/questions/:qid', studioKey, async (req, res, next)
   res.json({ status: 'dismissed', id: qid });
 });
 
-// POST /api/live/sessions/:pin/end - End session and archive into video (Studio Key)
+// POST /api/live/sessions/:pin/end - End session and archive into video (X-Studio-Key)
 router.post('/sessions/:pin/end', studioKey, async (req, res, next) => {
   const { pin } = req.params;
 
@@ -297,7 +292,6 @@ router.post('/sessions/:pin/end', studioKey, async (req, res, next) => {
     }
   }
 
-  // Create permanent archived video
   let recordedVideoId = `recorded-${pin}`;
   try {
     const video = new Video({
@@ -318,7 +312,6 @@ router.post('/sessions/:pin/end', studioKey, async (req, res, next) => {
     // Mongo offline
   }
 
-  // Clean up SSE hub and announce termination
   sseHub.endSession(pin, recordedVideoId);
   inMemorySessions.delete(pin);
 
@@ -329,8 +322,8 @@ router.post('/sessions/:pin/end', studioKey, async (req, res, next) => {
   }
 
   res.json({
+    videoId: recordedVideoId,
     status: 'ended',
-    recordedVideoId,
     offlinePackUrl: `/api/public/videos/${recordedVideoId}/offlinepack`
   });
 });

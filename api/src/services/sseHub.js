@@ -6,7 +6,6 @@
 
 class LiveSessionHub {
   constructor() {
-    // Map: pin -> { clients: Set(res), history: Array<{ id, event, data, ts }> }
     this.sessions = new Map();
     this.heartbeatInterval = null;
     this.startHeartbeat();
@@ -48,9 +47,56 @@ class LiveSessionHub {
       }
     }
 
+    // Mock mode streaming: send a board event and periodic captions every 2 seconds
+    let mockInterval = null;
+    let mockBoardTimeout = null;
+
+    if (process.env.MOCK_API === 'true') {
+      const sampleCaptions = [
+        { text: "Welcome everyone to our live accessible session.", isFinal: false },
+        { text: "Welcome everyone to our live accessible session.", isFinal: true },
+        { text: "Today we are demonstrating zero-runtime accessibility.", isFinal: false },
+        { text: "Today we are demonstrating zero-runtime accessibility.", isFinal: true },
+        { text: "Please use the questions box below to ask questions.", isFinal: true }
+      ];
+      let captionIndex = 0;
+
+      mockBoardTimeout = setTimeout(() => {
+        try {
+          const boardData = {
+            id: `board-${Date.now()}`,
+            text: "Lesson Note: 1. Zero runtime dependencies. 2. Native WebVTT and live speech recognition.",
+            ts: Date.now()
+          };
+          res.write(`id: mock-board-1\nevent: board\ndata: ${JSON.stringify(boardData)}\n\n`);
+        } catch (e) {
+          // Client disconnected
+        }
+      }, 500);
+
+      mockInterval = setInterval(() => {
+        try {
+          const cap = sampleCaptions[captionIndex % sampleCaptions.length];
+          captionIndex++;
+          const data = {
+            ...cap,
+            ts: Date.now()
+          };
+          res.write(`id: mock-cap-${Date.now()}\nevent: caption\ndata: ${JSON.stringify(data)}\n\n`);
+        } catch (e) {
+          clearInterval(mockInterval);
+        }
+      }, 2000);
+
+      if (mockInterval.unref) mockInterval.unref();
+      if (mockBoardTimeout.unref) mockBoardTimeout.unref();
+    }
+
     // Clean up on disconnect
     res.on('close', () => {
       session.clients.delete(res);
+      if (mockInterval) clearInterval(mockInterval);
+      if (mockBoardTimeout) clearTimeout(mockBoardTimeout);
     });
   }
 
@@ -61,7 +107,6 @@ class LiveSessionHub {
 
     session.history.push(entry);
 
-    // Keep memory bounded to last 1000 events per session
     if (session.history.length > 1000) {
       session.history.shift();
     }
@@ -79,11 +124,11 @@ class LiveSessionHub {
     return eventId;
   }
 
-  endSession(pin, recordedVideoId) {
+  endSession(pin, videoId) {
     const session = this.sessions.get(pin);
     if (!session) return;
 
-    const payload = `event: session-ended\ndata: ${JSON.stringify({ pin, recordedVideoId })}\n\n`;
+    const payload = `event: session-ended\ndata: ${JSON.stringify({ pin, videoId })}\n\n`;
     session.clients.forEach((client) => {
       try {
         client.write(payload);
@@ -105,7 +150,6 @@ class LiveSessionHub {
 
   startHeartbeat() {
     if (this.heartbeatInterval) return;
-    // Send comment heartbeat every 15 seconds to keep 3G connections alive
     this.heartbeatInterval = setInterval(() => {
       this.sessions.forEach((session) => {
         session.clients.forEach((client) => {

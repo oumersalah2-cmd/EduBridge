@@ -1,6 +1,6 @@
 /**
- * Realistic mock data conforming to OpenAPI 3.0 contract.
- * Allows teammates (Member 2 Studio and Member 3 Player) to develop against exact shapes.
+ * Realistic mock data conforming exactly to the EduBridge OpenAPI 3.0 contract.
+ * Single source of truth for Member 2 (Studio) and Member 3 (Player and Job Card).
  */
 
 const mockJobs = [
@@ -11,10 +11,11 @@ const mockJobs = [
     location: 'Addis Ababa, Ethiopia (Hybrid)',
     requirements: [
       'Basic understanding of screen readers (NVDA, TalkBack, Orca)',
-      'Familiarity with Web Content Accessibility Guidelines (WCAG 2.2 AA)',
+      'Testing Web Content Accessibility Guidelines (WCAG 2.2 AA)',
       'Fluency in Amharic and working English'
     ],
     deadline: '2026-12-15T00:00:00.000Z',
+    applyUrl: 'https://careers.ethiotelecom.et/accessibility-qa',
     applyLink: 'https://careers.ethiotelecom.et/accessibility-qa',
     certificateUrl: '/uploads/certs/accessible-qa-spec.pdf',
     audioSummaryUrl: '/uploads/jobs/job-eth-01-summary.mp3',
@@ -51,6 +52,7 @@ const mockJobs = [
       'Knowledge of WebVTT and semantic landmarks'
     ],
     deadline: '2026-12-30T00:00:00.000Z',
+    applyUrl: 'https://digitalbridge.et/jobs/web-dev',
     applyLink: 'https://digitalbridge.et/jobs/web-dev',
     certificateUrl: '/uploads/certs/offline-first-cert.pdf',
     audioSummaryUrl: '/uploads/jobs/job-eth-02-summary.mp3',
@@ -87,6 +89,7 @@ const mockJobs = [
       'Basic knowledge of Braille translation conventions is a plus'
     ],
     deadline: '2026-12-20T00:00:00.000Z',
+    applyUrl: 'https://aau.edu.et/careers/caption-reviewer',
     applyLink: 'https://aau.edu.et/careers/caption-reviewer',
     certificateUrl: '/uploads/certs/captioning-badge.pdf',
     audioSummaryUrl: '/uploads/jobs/job-eth-03-summary.mp3',
@@ -114,44 +117,92 @@ const mockJobs = [
   }
 ];
 
-const mockVideo = {
+const mockPublicVideo = {
   id: 'mock-video-demo-01',
   title: 'Introduction to Renewable Solar Cells (Demo)',
-  status: 'review',
-  progress: 100,
-  step: 'Transcription complete. Human review ready.',
+  status: 'published',
   audioUrl: '/uploads/audio/demo_lesson_64k.mp3',
   signVideoUrl: '/uploads/sign/demo_lesson_sign.mp4',
   captions: {
     en: {
       url: '/uploads/captions/demo_lesson_en.vtt',
-      status: 'human-reviewed'
+      reviewStatus: 'human-reviewed'
     },
     am: {
       url: '/uploads/captions/demo_lesson_am.vtt',
-      status: 'machine-generated'
+      reviewStatus: 'machine-generated'
     }
   },
-  transcriptText: 'Welcome to this introductory lesson on solar photovoltaic cells and accessible renewable technology.',
-  chatLog: [
-    {
-      id: 'chat-01',
-      type: 'board',
-      text: 'Lesson Goal: Understand the basic photovoltaic effect and semiconductor bandgaps.',
-      ts: 1700000000000
-    },
-    {
-      id: 'chat-02',
-      type: 'question',
-      text: 'How does silicon efficiency compare on cloudy days?',
-      ts: 1700000060000
-    }
-  ],
+  transcript: 'Welcome to this accessible lesson on renewable energy. Today we will explore solar photovoltaic cells and how they generate clean electricity. Notice how sunlight frees electrons in the semiconductor material.',
+  chatLog: [], // Empty for non-live lessons
   offlinePackUrl: '/api/public/videos/mock-video-demo-01/offlinepack',
   brailleUrl: '/uploads/braille/demo_lesson.brf'
 };
 
+// Map to track progress of mock videos created in this runtime
+const mockVideoProgressTracker = new Map();
+
+function getMockVideoProgress(id) {
+  if (id === 'mock-video-demo-01') {
+    return {
+      id,
+      status: 'review',
+      progress: 100,
+      step: 'Transcription complete. Human review ready.',
+      error: null
+    };
+  }
+
+  let record = mockVideoProgressTracker.get(id);
+  if (!record) {
+    record = { createdAt: Date.now() };
+    mockVideoProgressTracker.set(id, record);
+  }
+
+  const elapsedSec = (Date.now() - record.createdAt) / 1000;
+
+  if (elapsedSec < 3) {
+    return {
+      id,
+      status: 'uploaded',
+      progress: 10,
+      step: 'Video uploaded. Queued for audio extraction.',
+      error: null
+    };
+  } else if (elapsedSec < 7) {
+    return {
+      id,
+      status: 'processing',
+      progress: 40,
+      step: 'Extracting 16 kHz audio for transcription',
+      error: null
+    };
+  } else if (elapsedSec < 12) {
+    return {
+      id,
+      status: 'processing',
+      progress: 75,
+      step: 'Writing English captions with Whisper',
+      error: null
+    };
+  } else {
+    return {
+      id,
+      status: 'review',
+      progress: 100,
+      step: 'Transcription complete. Human review ready.',
+      error: null
+    };
+  }
+}
+
+function registerMockVideo(id) {
+  mockVideoProgressTracker.set(id, { createdAt: Date.now() });
+}
+
 module.exports = {
   mockJobs,
-  mockVideo
+  mockPublicVideo,
+  getMockVideoProgress,
+  registerMockVideo
 };

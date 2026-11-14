@@ -6,7 +6,11 @@ const archiver = require('archiver');
 
 const studioKey = require('../middleware/studioKey');
 const Video = require('../models/Video');
-const { mockVideo } = require('./mockData');
+const {
+  mockPublicVideo,
+  getMockVideoProgress,
+  registerMockVideo
+} = require('./mockData');
 
 // Router for studio / processing routes: /api/videos
 const videosRouter = express.Router();
@@ -68,7 +72,7 @@ function isValidWebVTT(content) {
 // Studio Routes (/api/videos)
 // ==========================================
 
-// POST /api/videos - Upload video and optional sign video
+// POST /api/videos - Upload video and optional sign video (X-Studio-Key)
 videosRouter.post(
   '/',
   studioKey,
@@ -78,10 +82,11 @@ videosRouter.post(
   ]),
   async (req, res, next) => {
     if (process.env.MOCK_API === 'true') {
+      const mockId = `mock-vid-${Date.now().toString(36)}`;
+      registerMockVideo(mockId);
       return res.status(202).json({
-        id: 'mock-video-demo-01',
-        status: 'uploaded',
-        message: 'Video upload accepted and queued for accessible processing.'
+        id: mockId,
+        status: 'uploaded'
       });
     }
 
@@ -118,18 +123,12 @@ videosRouter.post(
   }
 );
 
-// GET /api/videos/:id - Poll processing progress (for aria-live screen reader updates)
+// GET /api/videos/:id - Poll processing progress (for aria-live announcements)
 videosRouter.get('/:id', async (req, res, next) => {
   const { id } = req.params;
 
   if (process.env.MOCK_API === 'true') {
-    return res.json({
-      id,
-      status: mockVideo.status,
-      progress: mockVideo.progress,
-      step: mockVideo.step,
-      error: null
-    });
+    return res.json(getMockVideoProgress(id));
   }
 
   try {
@@ -137,10 +136,6 @@ videosRouter.get('/:id', async (req, res, next) => {
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       video = await Video.findById(id);
     }
-    if (!video && id === mockVideo.id) {
-      video = mockVideo;
-    }
-
     if (!video) {
       return res.status(404).json({
         error: `Lesson video with ID "${id}" was not found.`
@@ -148,7 +143,7 @@ videosRouter.get('/:id', async (req, res, next) => {
     }
 
     res.json({
-      id: video._id ? video._id.toString() : video.id,
+      id: video._id.toString(),
       status: video.status,
       progress: video.progress,
       step: video.step,
@@ -159,7 +154,7 @@ videosRouter.get('/:id', async (req, res, next) => {
   }
 });
 
-// PUT /api/videos/:id/captions/:lang - Save human-edited WebVTT (resets approval)
+// PUT /api/videos/:id/captions/:lang - Save human-edited WebVTT (X-Studio-Key, resets approval)
 videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
   const { id, lang } = req.params;
   const allowedLangs = ['en', 'am', 'om'];
@@ -183,8 +178,8 @@ videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
       id,
       lang,
       status: 'saved',
-      approved: false,
-      message: `Human edits saved for ${lang} captions. Review status has been reset to machine-generated.`
+      reviewStatus: 'machine-generated',
+      approved: false
     });
   }
 
@@ -208,7 +203,7 @@ videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
     video.captions[lang] = {
       vttPath: filepath,
       vttUrl: `/uploads/captions/${filename}`,
-      status: 'machine-generated', // Editing a track resets human approval
+      status: 'machine-generated', // Editing a track resets approval
       approvedAt: null
     };
 
@@ -218,6 +213,7 @@ videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
       id: video._id.toString(),
       lang,
       status: 'saved',
+      reviewStatus: 'machine-generated',
       approved: false
     });
   } catch (err) {
@@ -225,7 +221,7 @@ videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
   }
 });
 
-// POST /api/videos/:id/approve/:lang - Mark caption track human-approved
+// POST /api/videos/:id/approve/:lang - Mark caption track human-approved (X-Studio-Key)
 videosRouter.post('/:id/approve/:lang', studioKey, async (req, res, next) => {
   const { id, lang } = req.params;
   const allowedLangs = ['en', 'am', 'om'];
@@ -241,7 +237,7 @@ videosRouter.post('/:id/approve/:lang', studioKey, async (req, res, next) => {
       id,
       lang,
       approved: true,
-      status: 'human-reviewed'
+      reviewStatus: 'human-reviewed'
     });
   }
 
@@ -271,28 +267,27 @@ videosRouter.post('/:id/approve/:lang', studioKey, async (req, res, next) => {
       id: video._id.toString(),
       lang,
       approved: true,
-      status: 'human-reviewed'
+      reviewStatus: 'human-reviewed'
     });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/videos/:id/publish - Publish lesson, generate 3G bundle & return embeds
+// POST /api/videos/:id/publish - Publish lesson, build pack & return embeds (X-Studio-Key)
 videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
   const { id } = req.params;
   const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-  const embedSnippet = `<script src="${baseUrl}/player/embed.js" data-video-id="${id}"></script>`;
-  const iframeSnippet = `<iframe src="${baseUrl}/player/index.html?video=${id}" title="EduBridge Accessible Lesson Player" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
+  const embedScript = `<script src="${baseUrl}/player/embed.js" data-video-id="${id}"></script>`;
+  const embedIframe = `<iframe src="${baseUrl}/player/index.html?video=${id}" title="EduBridge Accessible Lesson Player" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
   const offlinePackUrl = `/api/public/videos/${id}/offlinepack`;
 
   if (process.env.MOCK_API === 'true') {
     return res.json({
-      id,
       status: 'published',
-      embedSnippet,
-      iframeSnippet,
+      embedScript,
+      embedIframe,
       offlinePackUrl
     });
   }
@@ -311,17 +306,16 @@ videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
 
     video.status = 'published';
     video.step = 'Lesson published and ready for accessible distribution.';
-    video.embedSnippet = embedSnippet;
-    video.iframeSnippet = iframeSnippet;
+    video.embedSnippet = embedScript;
+    video.iframeSnippet = embedIframe;
     video.offlinePackUrl = offlinePackUrl;
 
     await video.save();
 
     res.json({
-      id: video._id.toString(),
       status: video.status,
-      embedSnippet,
-      iframeSnippet,
+      embedScript,
+      embedIframe,
       offlinePackUrl
     });
   } catch (err) {
@@ -337,9 +331,9 @@ videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
 publicVideosRouter.get('/:id', async (req, res, next) => {
   const { id } = req.params;
 
-  if (process.env.MOCK_API === 'true' || id === mockVideo.id) {
+  if (process.env.MOCK_API === 'true' || id === mockPublicVideo.id) {
     return res.json({
-      ...mockVideo,
+      ...mockPublicVideo,
       id
     });
   }
@@ -361,19 +355,19 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
       title: video.title,
       status: video.status,
       audioUrl: video.audioUrl,
-      signVideoUrl: video.signVideoUrl,
+      signVideoUrl: video.signVideoUrl || null,
       captions: {
         en: video.captions?.en?.vttUrl
-          ? { url: video.captions.en.vttUrl, status: video.captions.en.status }
+          ? { url: video.captions.en.vttUrl, reviewStatus: video.captions.en.status }
           : undefined,
         am: video.captions?.am?.vttUrl
-          ? { url: video.captions.am.vttUrl, status: video.captions.am.status }
+          ? { url: video.captions.am.vttUrl, reviewStatus: video.captions.am.status }
           : undefined,
         om: video.captions?.om?.vttUrl
-          ? { url: video.captions.om.vttUrl, status: video.captions.om.status }
+          ? { url: video.captions.om.vttUrl, reviewStatus: video.captions.om.status }
           : undefined
       },
-      transcriptText: video.transcriptText,
+      transcript: video.transcriptText || '',
       chatLog: video.chatLog || [],
       offlinePackUrl: video.offlinePackUrl || `/api/public/videos/${video._id}/offlinepack`,
       brailleUrl: video.brailleUrl
@@ -397,19 +391,24 @@ publicVideosRouter.get('/:id/offlinepack', (req, res, next) => {
   archive.pipe(res);
 
   // Add offline package files
-  archive.append('EduBridge Audio-First Offline Lesson\nTranscript:\nWelcome to this accessible lesson.\n', {
+  archive.append('EduBridge Audio-First Offline Lesson\nTranscript:\nWelcome to this accessible lesson on renewable energy.\n', {
     name: 'transcript.txt'
   });
   archive.append(
     '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Offline Lesson</title></head><body><h1>EduBridge Offline Lesson</h1><p>Accessible offline content.</p></body></html>',
     { name: 'lesson.html' }
   );
-  archive.append('EduBridge English Braille Grade 1 Placeholder\n', {
+  archive.append(',edubridge accessible lesson\n,renewable energy\n', {
     name: 'lesson.brf'
   });
-  archive.append(Buffer.from([]), {
-    name: 'audio.mp3'
-  });
+
+  // Attach sample MP3 if present on disk, otherwise append sample buffer
+  const sampleMp3Path = path.join(AUDIO_DIR, 'demo_lesson_64k.mp3');
+  if (fs.existsSync(sampleMp3Path)) {
+    archive.file(sampleMp3Path, { name: 'audio.mp3' });
+  } else {
+    archive.append(Buffer.from([]), { name: 'audio.mp3' });
+  }
 
   archive.finalize();
 });

@@ -3,7 +3,7 @@ const app = require('../src/app');
 const sseHub = require('../src/services/sseHub');
 
 describe('API Contract & Mock Mode Tests (Phase A)', () => {
-  const TEST_KEY = 'test-studio-key-phase-a';
+  const TEST_KEY = 'test-studio-key-contract';
 
   beforeAll(() => {
     process.env.STUDIO_KEY = TEST_KEY;
@@ -14,109 +14,163 @@ describe('API Contract & Mock Mode Tests (Phase A)', () => {
     sseHub.stopHeartbeat();
   });
 
-  describe('GET /api/health and Documentation', () => {
-    it('returns status ok', async () => {
+  describe('GET /api/health and /api/docs', () => {
+    it('GET /api/health returns status ok', async () => {
       const res = await request(app).get('/api/health');
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ status: 'ok' });
     });
 
-    it('serves Swagger documentation at /api/docs/', async () => {
+    it('GET /api/docs renders Swagger UI documentation without error', async () => {
       const res = await request(app).get('/api/docs/');
       expect(res.status).toBe(200);
       expect(res.text).toContain('Swagger UI');
     });
   });
 
-  describe('Videos Contract & Lifecycle Endpoints', () => {
-    it('POST /api/videos requires X-Studio-Key header', async () => {
+  describe('Authentication & Authorization Gate', () => {
+    it('POST /api/videos rejects missing X-Studio-Key with 401 and plain-language message', async () => {
       const res = await request(app)
         .post('/api/videos')
-        .attach('video', Buffer.from('fake-video-bytes'), 'test.mp4');
+        .attach('video', Buffer.from('mock video bytes'), 'test.mp4');
       expect(res.status).toBe(401);
       expect(res.body.error).toContain('Unauthorized');
     });
 
-    it('POST /api/videos with valid key returns 202 with id and status', async () => {
+    it('POST /api/videos rejects invalid X-Studio-Key with 401', async () => {
+      const res = await request(app)
+        .post('/api/videos')
+        .set('X-Studio-Key', 'invalid-key')
+        .attach('video', Buffer.from('mock video bytes'), 'test.mp4');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toContain('Unauthorized');
+    });
+
+    it('PUT /api/videos/:id/captions/en rejects missing X-Studio-Key with 401', async () => {
+      const res = await request(app)
+        .put('/api/videos/mock-video-demo-01/captions/en')
+        .set('Content-Type', 'text/vtt')
+        .send('WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nHello');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toContain('Unauthorized');
+    });
+
+    it('POST /api/live/sessions rejects missing X-Studio-Key with 401', async () => {
+      const res = await request(app).post('/api/live/sessions');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toContain('Unauthorized');
+    });
+  });
+
+  describe('Video Studio & Public Contract Shapes', () => {
+    let uploadedId;
+
+    it('POST /api/videos with valid key returns 202 and shape { id, status: "uploaded" }', async () => {
       const res = await request(app)
         .post('/api/videos')
         .set('X-Studio-Key', TEST_KEY)
-        .attach('video', Buffer.from('fake-video-bytes'), 'lesson.mp4');
+        .attach('video', Buffer.from('fake mp4 data'), 'lesson.mp4');
       expect(res.status).toBe(202);
       expect(res.body).toHaveProperty('id');
-      expect(res.body).toHaveProperty('status');
+      expect(res.body.status).toBe('uploaded');
+      uploadedId = res.body.id;
     });
 
-    it('GET /api/videos/:id returns polling status with plain-language step', async () => {
-      const res = await request(app).get('/api/videos/mock-video-demo-01');
+    it('GET /api/videos/:id returns polling shape with progress and plain-language step', async () => {
+      const res = await request(app).get(`/api/videos/${uploadedId}`);
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('id');
-      expect(res.body).toHaveProperty('status');
-      expect(res.body).toHaveProperty('progress');
-      expect(res.body).toHaveProperty('step');
+      expect(res.body).toHaveProperty('id', uploadedId);
+      expect(['uploaded', 'processing', 'review', 'published']).toContain(res.body.status);
+      expect(typeof res.body.progress).toBe('number');
       expect(typeof res.body.step).toBe('string');
+      expect(res.body.step.length).toBeGreaterThan(5);
     });
 
-    it('PUT /api/videos/:id/captions/en saves valid WebVTT and resets approval to false', async () => {
-      const validVTT = 'WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nHello, welcome to this lesson.';
+    it('PUT /api/videos/:id/captions/en saves valid WebVTT and resets review approval', async () => {
+      const vtt = 'WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nTeacher: Updated text.';
       const res = await request(app)
         .put('/api/videos/mock-video-demo-01/captions/en')
         .set('X-Studio-Key', TEST_KEY)
         .set('Content-Type', 'text/vtt')
-        .send(validVTT);
+        .send(vtt);
       expect(res.status).toBe(200);
-      expect(res.body.approved).toBe(false);
-      expect(res.body.status).toBe('saved');
+      expect(res.body).toEqual({
+        id: 'mock-video-demo-01',
+        lang: 'en',
+        status: 'saved',
+        reviewStatus: 'machine-generated',
+        approved: false
+      });
     });
 
     it('PUT /api/videos/:id/captions/en rejects invalid WebVTT with 400', async () => {
-      const invalidVTT = 'NOT_A_VALID_VTT_HEADER\n00:01 text';
       const res = await request(app)
         .put('/api/videos/mock-video-demo-01/captions/en')
         .set('X-Studio-Key', TEST_KEY)
         .set('Content-Type', 'text/vtt')
-        .send(invalidVTT);
+        .send('INVALID_HEADER\ntext');
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('Invalid WebVTT');
     });
 
-    it('POST /api/videos/:id/approve/en approves track with human-reviewed status', async () => {
+    it('POST /api/videos/:id/approve/en marks reviewStatus human-reviewed', async () => {
       const res = await request(app)
         .post('/api/videos/mock-video-demo-01/approve/en')
         .set('X-Studio-Key', TEST_KEY);
       expect(res.status).toBe(200);
-      expect(res.body.approved).toBe(true);
+      expect(res.body).toEqual({
+        id: 'mock-video-demo-01',
+        lang: 'en',
+        approved: true,
+        reviewStatus: 'human-reviewed'
+      });
     });
 
-    it('POST /api/videos/:id/publish sets status published and returns embed snippets', async () => {
+    it('POST /api/videos/:id/publish returns { status, embedScript, embedIframe, offlinePackUrl }', async () => {
       const res = await request(app)
         .post('/api/videos/mock-video-demo-01/publish')
         .set('X-Studio-Key', TEST_KEY);
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('published');
-      expect(res.body.embedSnippet).toContain('<script');
-      expect(res.body.iframeSnippet).toContain('<iframe');
+      expect(res.body.embedScript).toContain('<script');
+      expect(res.body.embedIframe).toContain('<iframe');
+      expect(res.body.offlinePackUrl).toContain('/offlinepack');
     });
 
-    it('GET /api/public/videos/:id returns public metadata and review status', async () => {
+    it('GET /api/public/videos/:id returns metadata, captions with reviewStatus, and transcript', async () => {
       const res = await request(app).get('/api/public/videos/mock-video-demo-01');
       expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('id');
       expect(res.body).toHaveProperty('title');
-      expect(res.body).toHaveProperty('captions');
-      expect(res.body).toHaveProperty('transcriptText');
+      expect(res.body).toHaveProperty('status');
+      expect(res.body).toHaveProperty('audioUrl');
+      expect(res.body).toHaveProperty('signVideoUrl');
+      expect(res.body).toHaveProperty('transcript');
+      expect(typeof res.body.transcript).toBe('string');
+      expect(res.body).toHaveProperty('chatLog');
+      expect(Array.isArray(res.body.chatLog)).toBe(true);
+
+      // Verify captions per language
+      expect(res.body.captions).toHaveProperty('en');
+      expect(res.body.captions.en.reviewStatus).toBe('human-reviewed');
+      expect(res.body.captions.en.url).toBe('/uploads/captions/demo_lesson_en.vtt');
+
+      expect(res.body.captions).toHaveProperty('am');
+      expect(res.body.captions.am.reviewStatus).toBe('machine-generated');
+      expect(res.body.captions.am.url).toBe('/uploads/captions/demo_lesson_am.vtt');
     });
 
-    it('GET /api/public/videos/:id/offlinepack downloads zip stream', async () => {
+    it('GET /api/public/videos/:id/offlinepack downloads zip bundle with audio, transcript, lesson.html, brf', async () => {
       const res = await request(app).get('/api/public/videos/mock-video-demo-01/offlinepack');
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toContain('application/zip');
     });
   });
 
-  describe('Live Classroom Companion Endpoints', () => {
+  describe('Live Classroom Companion Contract Shapes', () => {
     let sessionPin;
 
-    it('POST /api/live/sessions creates session with 6-digit PIN', async () => {
+    it('POST /api/live/sessions creates session returning { pin (6 digits), joinUrl, expiresAt }', async () => {
       const res = await request(app)
         .post('/api/live/sessions')
         .set('X-Studio-Key', TEST_KEY);
@@ -127,34 +181,40 @@ describe('API Contract & Mock Mode Tests (Phase A)', () => {
       sessionPin = res.body.pin;
     });
 
-    it('POST /api/live/sessions/:pin/captions broadcasts caption', async () => {
+    it('POST /api/live/sessions/:pin/captions broadcasts speech captions', async () => {
       const res = await request(app)
         .post(`/api/live/sessions/${sessionPin}/captions`)
         .set('X-Studio-Key', TEST_KEY)
-        .send({ text: 'Testing live teacher speech recognition.', isFinal: true, ts: Date.now() });
+        .send({ text: 'Welcome to this live session.', isFinal: true, ts: Date.now() });
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('broadcasted');
+      expect(res.body).toEqual({ status: 'broadcasted' });
     });
 
-    it('POST /api/live/sessions/:pin/board broadcasts board note', async () => {
+    it('POST /api/live/sessions/:pin/board broadcasts board notes', async () => {
       const res = await request(app)
         .post(`/api/live/sessions/${sessionPin}/board`)
         .set('X-Studio-Key', TEST_KEY)
-        .send({ text: 'Theorem: Accessible education scales when zero dependencies are required.' });
+        .send({ text: 'Board Note: PV cells convert solar photons to voltage.' });
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('broadcasted');
+      expect(res.body).toEqual({ status: 'broadcasted' });
     });
 
-    it('POST /api/live/sessions/:pin/questions accepts student question', async () => {
-      const res = await request(app)
+    it('POST /api/live/sessions/:pin/questions accepts student question and rejects >500 chars', async () => {
+      const resValid = await request(app)
         .post(`/api/live/sessions/${sessionPin}/questions`)
-        .send({ text: 'What is the minimum bandwidth required for the audio stream?' });
-      expect(res.status).toBe(201);
-      expect(res.body).toHaveProperty('id');
-      expect(res.body.status).toBe('received');
+        .send({ text: 'How do solar cells handle extreme heat?' });
+      expect(resValid.status).toBe(201);
+      expect(resValid.body).toHaveProperty('id');
+      expect(resValid.body.status).toBe('received');
+
+      const resTooLong = await request(app)
+        .post(`/api/live/sessions/${sessionPin}/questions`)
+        .send({ text: 'a'.repeat(501) });
+      expect(resTooLong.status).toBe(400);
+      expect(resTooLong.body.error).toContain('500 characters');
     });
 
-    it('GET /api/live/sessions/:pin/questions returns teacher questions list', async () => {
+    it('GET /api/live/sessions/:pin/questions returns teacher question queue', async () => {
       const res = await request(app)
         .get(`/api/live/sessions/${sessionPin}/questions`)
         .set('X-Studio-Key', TEST_KEY);
@@ -162,43 +222,75 @@ describe('API Contract & Mock Mode Tests (Phase A)', () => {
       expect(Array.isArray(res.body)).toBe(true);
     });
 
-    it('POST /api/live/sessions/:pin/end archives session and closes room', async () => {
+    it('DELETE /api/live/sessions/:pin/questions/:qid dismisses a question', async () => {
+      const res = await request(app)
+        .delete(`/api/live/sessions/${sessionPin}/questions/q-mock-1`)
+        .set('X-Studio-Key', TEST_KEY);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ status: 'dismissed', id: 'q-mock-1' });
+    });
+
+    it('POST /api/live/sessions/:pin/end ends session and returns { videoId }', async () => {
       const res = await request(app)
         .post(`/api/live/sessions/${sessionPin}/end`)
         .set('X-Studio-Key', TEST_KEY);
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('ended');
-      expect(res.body).toHaveProperty('recordedVideoId');
+      expect(res.body).toHaveProperty('videoId');
     });
   });
 
-  describe('Jobs API Endpoints', () => {
-    it('GET /api/jobs returns at least 3 Ethiopian job cards', async () => {
+  describe('Accessible Jobs Opportunities Contract & JSON-LD', () => {
+    it('GET /api/jobs returns at least 3 Ethiopian job cards with all required fields', async () => {
       const res = await request(app).get('/api/jobs');
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThanOrEqual(3);
+
+      res.body.forEach((job) => {
+        expect(job).toHaveProperty('id');
+        expect(job).toHaveProperty('title');
+        expect(job).toHaveProperty('employer');
+        expect(job).toHaveProperty('location');
+        expect(job).toHaveProperty('requirements');
+        expect(job).toHaveProperty('deadline');
+        expect(job).toHaveProperty('applyUrl');
+        expect(job).toHaveProperty('certificateUrl');
+        expect(job).toHaveProperty('audioSummaryUrl');
+        expect(job).toHaveProperty('textSummary');
+      });
     });
 
     it('each job card contains valid schema.org/JobPosting JSON-LD', async () => {
       const res = await request(app).get('/api/jobs');
       expect(res.status).toBe(200);
+
       res.body.forEach((job) => {
-        expect(job).toHaveProperty('jsonLd');
-        expect(job.jsonLd['@context']).toBe('https://schema.org');
-        expect(job.jsonLd['@type']).toBe('JobPosting');
-        expect(job.jsonLd).toHaveProperty('title');
-        expect(job.jsonLd).toHaveProperty('hiringOrganization');
+        const jsonLd = job.jsonLd;
+        expect(jsonLd).toBeDefined();
+        expect(jsonLd['@context']).toBe('https://schema.org');
+        expect(jsonLd['@type']).toBe('JobPosting');
+        expect(jsonLd).toHaveProperty('title');
+        expect(jsonLd).toHaveProperty('hiringOrganization');
+        expect(jsonLd.hiringOrganization['@type']).toBe('Organization');
+        expect(jsonLd.hiringOrganization).toHaveProperty('name');
+        expect(jsonLd).toHaveProperty('jobLocation');
+        expect(jsonLd.jobLocation['@type']).toBe('Place');
+        expect(jsonLd.jobLocation.address['@type']).toBe('PostalAddress');
+        expect(jsonLd).toHaveProperty('description');
+        expect(jsonLd).toHaveProperty('validThrough');
+        expect(jsonLd).toHaveProperty('employmentType');
       });
     });
 
-    it('GET /api/jobs/:id returns single job card', async () => {
+    it('GET /api/jobs/:id returns single job card with JSON-LD', async () => {
       const res = await request(app).get('/api/jobs/job-eth-01');
       expect(res.status).toBe(200);
+      expect(res.body.id).toBe('job-eth-01');
       expect(res.body.title).toBe('Junior Accessibility QA Tester');
+      expect(res.body.jsonLd['@type']).toBe('JobPosting');
     });
 
-    it('GET /api/jobs/nonexistent-id returns 404 with plain-language error', async () => {
+    it('GET /api/jobs/nonexistent-id returns 404 with plain-language message', async () => {
       const res = await request(app).get('/api/jobs/nonexistent-id');
       expect(res.status).toBe(404);
       expect(res.body.error).toContain('was not found');

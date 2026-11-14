@@ -20,20 +20,24 @@ function getLocalIp() {
 }
 
 async function startServer() {
-  try {
-    await mongoose.connect(MONGO_URL, {
-      serverSelectionTimeoutMS: 3000,
-    });
-    console.log(`Connected to MongoDB at ${MONGO_URL}`);
-  } catch (err) {
-    console.warn(`MongoDB connection warning: ${err.message}. Starting in offline/standalone mode.`);
+  if (process.env.MOCK_API === 'true') {
+    console.log('⚡ EduBridge Mock API active (MOCK_API=true). Fast standalone mode enabled.');
+  } else {
+    try {
+      await mongoose.connect(MONGO_URL, {
+        serverSelectionTimeoutMS: 3000,
+      });
+      console.log(`Connected to MongoDB at ${MONGO_URL}`);
+    } catch (err) {
+      console.warn(`MongoDB connection warning: ${err.message}. Starting in offline/standalone mode.`);
+    }
   }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     const lanIp = getLocalIp();
     console.log(`EduBridge API server running on:`);
     console.log(`  Local:   http://localhost:${PORT}`);
-    console.log(`  Hotspot: http://${lanIp}:${PORT}`);
+    console.log(`  LAN:     http://${lanIp}:${PORT}`);
     console.log(`  Docs:    http://${lanIp}:${PORT}/api/docs`);
     console.log(`  Health:  http://${lanIp}:${PORT}/api/health`);
   });
