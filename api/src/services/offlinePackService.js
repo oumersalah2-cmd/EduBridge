@@ -177,7 +177,9 @@ function packLessonZip(video, outputStream) {
     archive.append(transcriptText, { name: 'transcript.txt' });
 
     // 3. audio.mp3 (64 kbps mono audio)
-    const demoAudio = path.resolve(__dirname, '../../assets/demo/demo_lesson_64k.mp3');
+    // Never fall back to demo audio in real mode
+    const isMockOrDemo = process.env.MOCK_API === 'true' || video.isDemo;
+    const demoAudio = isMockOrDemo ? path.resolve(__dirname, '../../assets/demo/demo_lesson_64k.mp3') : null;
     const audioCandidates = [video.mp3Path, video.audioPath, demoAudio].filter(Boolean);
     const resolvedAudio = audioCandidates.find((p) => fs.existsSync(p));
 
@@ -188,7 +190,8 @@ function packLessonZip(video, outputStream) {
     }
 
     // 4. lesson.brf (Braille file if exists)
-    const demoBraille = path.resolve(__dirname, '../../assets/demo/demo_lesson.brf');
+    // Include Braille only if the lesson has its own (no demo Braille fallback in real mode)
+    const demoBraille = isMockOrDemo ? path.resolve(__dirname, '../../assets/demo/demo_lesson.brf') : null;
     const brailleCandidates = [video.braillePath, demoBraille].filter(Boolean);
     const resolvedBraille = brailleCandidates.find((p) => fs.existsSync(p));
 

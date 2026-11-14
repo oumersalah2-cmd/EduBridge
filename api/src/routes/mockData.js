@@ -16,7 +16,7 @@ function getMockJobs(req) {
       deadline: '2026-12-15T00:00:00.000Z',
       applyUrl: 'https://careers.ethiotelecom.et/accessibility-qa',
       applyLink: 'https://careers.ethiotelecom.et/accessibility-qa',
-      certificateUrl: `${base}/uploads/certs/accessible-qa-spec.pdf`,
+      certificateUrl: `${base}/api/v1/certificates/cert-eth-01/verify`,
       audioSummaryUrl: `${base}/uploads/jobs/job-eth-01-summary.mp3`,
       textSummary: 'Entry-level position testing telecom mobile applications for screen reader accessibility and low-bandwidth resilience.',
       jsonLd: {
@@ -53,7 +53,7 @@ function getMockJobs(req) {
       deadline: '2026-12-30T00:00:00.000Z',
       applyUrl: 'https://digitalbridge.et/jobs/web-dev',
       applyLink: 'https://digitalbridge.et/jobs/web-dev',
-      certificateUrl: `${base}/uploads/certs/offline-first-cert.pdf`,
+      certificateUrl: `${base}/api/v1/certificates/cert-eth-02/verify`,
       audioSummaryUrl: `${base}/uploads/jobs/job-eth-02-summary.mp3`,
       textSummary: 'Develop zero-dependency offline web applications delivering accessible multimedia to rural schools.',
       jsonLd: {
@@ -90,7 +90,7 @@ function getMockJobs(req) {
       deadline: '2026-12-20T00:00:00.000Z',
       applyUrl: 'https://aau.edu.et/careers/caption-reviewer',
       applyLink: 'https://aau.edu.et/careers/caption-reviewer',
-      certificateUrl: `${base}/uploads/certs/captioning-badge.pdf`,
+      certificateUrl: `${base}/api/v1/certificates/cert-eth-03/verify`,
       audioSummaryUrl: `${base}/uploads/jobs/job-eth-03-summary.mp3`,
       textSummary: 'Review and approve educational video captions, audio descriptions, and transcripts for university lectures.',
       jsonLd: {
@@ -126,6 +126,7 @@ function getMockPublicVideo(id = 'mock-video-demo-01', req) {
     videoUrl: `${base}/assets/demo/demo_lesson_sign.mp4`,
     audioUrl: `${base}/assets/demo/demo_lesson_64k.mp3`,
     signVideoUrl: `${base}/assets/demo/demo_lesson_sign.mp4`,
+    audioDescriptionUrl: null,
     captions: {
       en: {
         url: `${base}/assets/demo/demo_lesson_en.vtt`,
