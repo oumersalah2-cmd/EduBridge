@@ -30,6 +30,10 @@ components:
           type: string
           description: Accessible plain-language explanation of the issue (no stack traces or jargon).
           example: "Unauthorized: Invalid or missing X-Studio-Key header. Access to studio write operations requires a valid key."
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          example: "KEY_INVALID"
 
     HealthResponse:
       type: object
@@ -204,6 +208,12 @@ components:
           type: string
           nullable: true
           example: "http://localhost:4000/assets/demo/demo_lesson_sign.mp4"
+        audioDescriptionUrl:
+          type: string
+          nullable: true
+          format: uri
+          description: Absolute URL to the standalone audio description MP3 file (null if none provided).
+          example: null
         captions:
           type: object
           properties:
@@ -276,6 +286,12 @@ components:
           type: string
           nullable: true
           example: "http://localhost:4000/assets/demo/demo_lesson_sign.mp4"
+        audioDescriptionUrl:
+          type: string
+          nullable: true
+          format: uri
+          description: Absolute URL to the standalone audio description MP3 file (null if none provided).
+          example: null
         captions:
           type: object
           properties:
@@ -436,6 +452,153 @@ components:
           type: object
           description: Valid schema.org/JobPosting object
 
+    LessonV1Response:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - tracks
+        - offlinePackSizeBytes
+      properties:
+        id:
+          type: string
+          example: "mock-video-demo-01"
+        title:
+          type: string
+          example: "Introduction to Renewable Solar Cells (Demo)"
+        status:
+          type: string
+          example: "published"
+        videoUrl:
+          type: string
+          nullable: true
+          example: "http://localhost:4000/assets/demo/demo_lesson_sign.mp4"
+        audioUrl:
+          type: string
+          example: "http://localhost:4000/assets/demo/demo_lesson_64k.mp3"
+        signVideoUrl:
+          type: string
+          nullable: true
+          example: "http://localhost:4000/assets/demo/demo_lesson_sign.mp4"
+        audioDescriptionUrl:
+          type: string
+          nullable: true
+          example: null
+        captions:
+          type: object
+        tracks:
+          type: array
+          items:
+            type: object
+            required:
+              - kind
+            properties:
+              kind:
+                type: string
+                enum: [captions, sign, audio, audio-description]
+              lang:
+                type: string
+                example: "en"
+              url:
+                type: string
+                nullable: true
+              reviewStatus:
+                type: string
+                enum: [machine-generated, human-reviewed]
+        transcript:
+          type: string
+          example: "Welcome to this accessible lesson on renewable energy..."
+        chatLog:
+          type: array
+          items:
+            type: object
+        offlinePackUrl:
+          type: string
+          example: "http://localhost:4000/api/public/videos/mock-video-demo-01/offlinepack"
+        offlinePackSizeBytes:
+          type: integer
+          example: 1048576
+        brailleUrl:
+          type: string
+          nullable: true
+          example: "http://localhost:4000/assets/demo/demo_lesson.brf"
+
+    WebhookResponse:
+      type: object
+      required:
+        - id
+        - url
+        - events
+        - createdAt
+      properties:
+        id:
+          type: string
+          example: "wh-673641234abcd"
+        url:
+          type: string
+          example: "https://partner.example.et/webhooks"
+        events:
+          type: array
+          items:
+            type: string
+            enum: [lesson.published, captions.approved]
+          example: ["lesson.published"]
+        createdAt:
+          type: string
+          format: date-time
+
+    WebhookCreateRequest:
+      type: object
+      required:
+        - url
+        - events
+      properties:
+        url:
+          type: string
+          format: uri
+          example: "https://partner.example.et/webhooks"
+        events:
+          type: array
+          items:
+            type: string
+            enum: [lesson.published, captions.approved]
+          example: ["lesson.published"]
+
+    CertificateCreateRequest:
+      type: object
+      required:
+        - recipientName
+        - courseTitle
+      properties:
+        recipientName:
+          type: string
+          example: "Abebe Bikila"
+        recipientEmail:
+          type: string
+          example: "abebe@example.et"
+        courseTitle:
+          type: string
+          example: "Low-Bandwidth Web Accessibility Fundamentals"
+        issuerName:
+          type: string
+          example: "EduBridge / Digital Bridge Initiative"
+
+    CertificateVerifyResponse:
+      type: object
+      required:
+        - valid
+        - credential
+      properties:
+        valid:
+          type: boolean
+          example: true
+        reason:
+          type: string
+          nullable: true
+        credential:
+          type: object
+
 paths:
   /api/health:
     get:
@@ -474,6 +637,10 @@ paths:
                   type: string
                   format: binary
                   description: Optional synchronized sign-language video
+                audioDescription:
+                  type: string
+                  format: binary
+                  description: Optional human-narrated audio description MP3 file (.mp3)
       responses:
         '202':
           description: Video accepted and queued for processing
@@ -1069,6 +1236,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /docs:
+    get:
+      summary: Swagger UI Documentation (Root Alias)
+      description: Interactive API documentation.
+      responses:
+        '200':
+          description: Interactive HTML documentation
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /openapi.json:
+    get:
+      summary: OpenAPI Specification JSON (Root Alias)
+      description: Raw OpenAPI 3.0 document in JSON format.
+      responses:
+        '200':
+          description: OpenAPI JSON specification
+          content:
+            application/json:
+              schema:
+                type: object
+
   /api/docs:
     get:
       summary: Swagger UI Interactive Documentation
@@ -1093,3 +1284,334 @@ paths:
             application/json:
               schema:
                 type: object
+
+  /api/v1/lessons/{id}:
+    get:
+      summary: Get Published Lesson (v1)
+      description: Returns published lesson with tracks array and offline pack size in bytes. Returns 409 if not published.
+      operationId: getLessonV1
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "mock-video-demo-01"
+      responses:
+        '200':
+          description: Published lesson details with tracks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonV1Response'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict - lesson not yet published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete Lesson and Associated Media (v1)
+      description: Permanently deletes lesson record and associated video, audio, captions, and zip files from server storage.
+      operationId: deleteLessonV1
+      security:
+        - StudioKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Lesson and all associated files deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/lessons/{id}/transcript:
+    get:
+      summary: Get Lesson Plain-Text Transcript (v1)
+      description: Returns raw plain text transcript for accessibility and text readers.
+      operationId: getLessonTranscriptV1
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [en, am]
+            default: en
+          description: Language code (en or am)
+      responses:
+        '200':
+          description: Plain-text transcript
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Invalid language requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lesson or transcript for requested language not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/lessons/{id}/offline-pack:
+    get:
+      summary: Download Offline Pack (v1 Alias)
+      description: Alias to /api/public/videos/{id}/offlinepack. Streams 3G offline package ZIP.
+      operationId: getOfflinePackV1
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 3G offline zip package
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Lesson not published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/lessons/{id}/captions:
+    post:
+      summary: Add or Replace Captions via JSON (v1)
+      description: Submits or updates WebVTT captions for a specific language track. Resets approval status to machine-generated.
+      operationId: updateLessonCaptionsV1
+      security:
+        - StudioKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lang
+                - vtt
+              properties:
+                lang:
+                  type: string
+                  enum: [en, am, om]
+                  example: "am"
+                vtt:
+                  type: string
+                  description: Full WebVTT content starting with WEBVTT header
+                  example: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንኳን ወደዚህ ትምህርት በደህና መጡ።"
+      responses:
+        '200':
+          description: Captions saved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  lang:
+                    type: string
+                  status:
+                    type: string
+                    example: "saved"
+                  reviewStatus:
+                    type: string
+                    example: "machine-generated"
+                  approved:
+                    type: boolean
+                    example: false
+        '400':
+          description: Invalid language or WebVTT format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/webhooks:
+    post:
+      summary: Register Outbound Webhook (v1)
+      description: Registers an HTTP endpoint to receive event notifications (e.g. lesson.published, captions.approved).
+      operationId: createWebhookV1
+      security:
+        - StudioKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookCreateRequest'
+      responses:
+        '201':
+          description: Webhook registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          description: Invalid webhook URL or events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List Registered Webhooks (v1)
+      description: Returns all active outbound webhook subscriptions.
+      operationId: listWebhooksV1
+      security:
+        - StudioKeyAuth: []
+      responses:
+        '200':
+          description: List of registered webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebhookResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/webhooks/{id}:
+    delete:
+      summary: Delete Webhook (v1)
+      description: Unregisters a webhook subscription.
+      operationId: deleteWebhookV1
+      security:
+        - StudioKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Webhook deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Webhook not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/certificates:
+    post:
+      summary: Issue Cryptographically Signed Learner Certificate (v1)
+      description: Issues an Ed25519-signed Open Badges-compliant verifiable educational credential.
+      operationId: issueCertificateV1
+      security:
+        - StudioKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateCreateRequest'
+      responses:
+        '201':
+          description: Signed certificate assertion
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/certificates/{id}/verify:
+    get:
+      summary: Verify Learner Certificate Signature (v1)
+      description: Publicly verifies the cryptographic Ed25519 signature of an issued badge credential.
+      operationId: verifyCertificateV1
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cryptographic verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateVerifyResponse'
+

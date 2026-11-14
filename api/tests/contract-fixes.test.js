@@ -43,7 +43,7 @@ describe('Job 1: Contract Fixes, Absolute URLs, CORS, and SSE Tests', () => {
         .set('X-Studio-Key', TEST_KEY);
       expect(res.status).toBe(200);
       expect(res.body.offlinePackUrl).toMatch(/^http:\/\/localhost:4000\//);
-      expect(res.body.embedScript).toContain('http://localhost:4000/player/embed.js');
+      expect(res.body.embedScript).toContain('http://localhost:4000/module/db-player.js');
       expect(res.body.embedIframe).toContain('http://localhost:4000/player/index.html');
     });
 

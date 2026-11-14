@@ -236,6 +236,33 @@ Takes a target video path as a CLI argument, validates the container with `ffpro
 
 ## 9. Changes Log
 
+### 2026-11-14 (Update 3 - ALX Track 2 Conformance)
+- **Root Single Contract**: Authoritative specification moved to root `openapi.yaml`. Loaded via `OPENAPI_PATH` environment variable. Swagger UI served at both `/docs` and `/api/docs`; raw JSON served at `/openapi.json` and `/api/openapi.json`. Mounted read-only into Docker.
+- **Additive `/api/v1` Service Layer**:
+  - `GET /api/v1/lessons/:id`: Published-only endpoint returning rich `tracks` array (`captions`, `sign`, `audio`, `audio-description`) and `offlinePackSizeBytes`.
+  - `GET /api/v1/lessons/:id/transcript?lang=en|am`: Direct `text/plain` transcript for accessibility.
+  - `GET /api/v1/lessons/:id/offline-pack`: Direct alias to 3G ZIP bundle download.
+  - `POST /api/v1/lessons/:id/captions`: JSON body `{ lang, vtt }` with `X-Studio-Key`, saving WebVTT and resetting approval status to `machine-generated`.
+  - `DELETE /api/v1/lessons/:id`: `X-Studio-Key` endpoint deleting MongoDB record AND unlinking all source video, audio, captions, and ZIP files from server disk (returns 204).
+  - Outbound Webhooks (`POST/GET/DELETE /api/v1/webhooks`): Dispatches `lesson.published` and `captions.approved` events (`{ event, lessonId, at }`) with 5s timeout, 1 retry, SSRF private IP validation (bypassable with `WEBHOOK_ALLOW_PRIVATE=true`), and optional HMAC-SHA256 signature (`X-EduBridge-Signature`).
+  - Ed25519 Signed Certificates (`POST /api/v1/certificates`, `GET /api/v1/certificates/:id/verify`): Issues and verifies tamper-evident Open Badges-compliant credentials; linked directly to job cards.
+- **Live Classroom Archive Rebuild**:
+  - Rebuilt `POST /api/live/sessions/:pin/end` (and `/api/v1` alias): WebVTT built from final captions with timestamps relative to session start, no overlaps, and sensible cue durations; plain-text transcript; chronologically unified `chatLog` (questions and board notes); immediate offline ZIP build; lesson record with `status: "review"`, `videoUrl: null`, `machine-generated` English captions; dispatches SSE `session-ended` event with `{ pin, videoId }` and closes all connections.
+- **Amharic Human-First Pipeline**:
+  - Completely removed external translation-model dependencies.
+  - Controlled by `AMHARIC_MODE=off` (default; human-first without auto-generated Amharic) or `direct` (Whisper ASR draft tagged `machine-generated`).
+  - Added CLI evaluation utility `api/scripts/measure-wer.py` supporting `jiwer` and fallback word-level Levenshtein DP.
+- **Audio Description Support**:
+  - Optional `audioDescription` multipart file on `POST /api/videos` (MP3). Stored in `uploads/audio/`, exposed as `audioDescriptionUrl`, and listed under `tracks`.
+- **Stable Error Codes**:
+  - Added structured `code` string (e.g. `KEY_REQUIRED`, `LESSON_NOT_FOUND`, `SESSION_NOT_FOUND`, `NO_FINAL_CAPTIONS`, `INVALID_VTT`, `FILE_TYPE_NOT_ALLOWED`, `FILE_TOO_LARGE`) alongside human-readable `error` on every error response.
+- **Tunnel & Trust Proxy Support**:
+  - Enabled `app.set('trust proxy', true)`. Dynamic base URL resolution inspects `X-Forwarded-Proto` and `X-Forwarded-Host` when `PUBLIC_BASE_URL` is empty.
+- **Docker & Web Gateway**:
+  - Added `web` gateway service (`nginx:alpine` on port 8080) with SSE buffer bypass (`proxy_buffering off;`) and static mounts for `./savanna`, `./module`, and `./demo`.
+  - Added base faster-whisper model bake in `api/Dockerfile`.
+  - Auto-seeding of stable demo lesson (`"demo"`) and Ethiopian job postings on startup when database is empty.
+
 ### 2026-11-14 (Update 2)
 - **Direct Source Video URL**: Added `videoUrl` (absolute via `PUBLIC_BASE_URL`) to `GET /api/public/videos/:id`, `GET /api/videos/:id/preview`, mock mode, and `openapi.yaml`. In real mode it points to the uploaded video file with HTTP range support (returns `null` for live-origin or audio-only sessions).
 - **Studio Preview & Raw Captions Endpoint**: Added authenticated `GET /api/videos/:id/preview` (`X-Studio-Key`) returning the full public shape plus `rawCaptions: { en: "<vtt text>", am: "<vtt text or null>" }` for direct editing in the teacher Studio for any status except `failed` (which returns 409).
