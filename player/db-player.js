@@ -511,6 +511,39 @@ class DbPlayer extends HTMLElement {
           background: #1f2937;
           padding: 0.35rem 0.5rem;
           border-bottom: 1px solid #374151;
+          cursor: grab;
+          user-select: none;
+          touch-action: none;
+        }
+
+        .sign-header:active {
+          cursor: grabbing;
+        }
+
+        .sign-resize-handle {
+          position: absolute;
+          bottom: 0;
+          right: 0;
+          width: 24px;
+          height: 24px;
+          background: rgba(17, 24, 39, 0.9);
+          color: #93c5fd;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: nwse-resize;
+          user-select: none;
+          font-size: 14px;
+          border-top-left-radius: 6px;
+          border-left: 1px solid #3b82f6;
+          border-top: 1px solid #3b82f6;
+          z-index: 5;
+          touch-action: none;
+        }
+
+        .sign-resize-handle:hover {
+          background: #2563eb;
+          color: #ffffff;
         }
 
         .sign-title {
@@ -989,8 +1022,8 @@ class DbPlayer extends HTMLElement {
           aria-label="${t.signLanguageTitle}"
           role="region">
           
-          <div class="sign-header">
-            <span class="sign-title">🤟 EthSL</span>
+          <div class="sign-header" id="sign-drag-header" title="Drag to move sign window">
+            <span class="sign-title">⋮⋮ 🤟 EthSL</span>
             <div class="sign-actions" role="toolbar" aria-label="Sign window controls">
               <button type="button" class="btn-pip-ctrl" id="btn-pos-tl" aria-label="${t.signMoveTL}">↖</button>
               <button type="button" class="btn-pip-ctrl" id="btn-pos-tr" aria-label="${t.signMoveTR}">↗</button>
@@ -1008,6 +1041,11 @@ class DbPlayer extends HTMLElement {
             muted 
             preload="metadata">
           </video>
+
+          <!-- Free Pointer Resize Handle -->
+          <div class="sign-resize-handle" id="sign-resize-handle" title="Drag to resize window" aria-label="Resize sign language window">
+            ⇲
+          </div>
         </div>
 
         <!-- Caption Settings Flyout Panel -->
@@ -1401,7 +1439,7 @@ class DbPlayer extends HTMLElement {
     fsBtn.addEventListener('click', toggleFullscreen);
 
     // -------------------------------------------------------------
-    // ETHIOPIAN SIGN LANGUAGE (EthSL) TOGGLE & BUTTON PRESETS
+    // ETHIOPIAN SIGN LANGUAGE (EthSL) TOGGLE & DRAGGABLE / RESIZABLE
     // -------------------------------------------------------------
     const toggleSignLanguage = () => {
       this.signVisible = !this.signVisible;
@@ -1434,6 +1472,11 @@ class DbPlayer extends HTMLElement {
     const setSignPosition = (pos) => {
       this.signPosition = pos;
       localStorage.setItem('edubridge_sign_position', pos);
+      // Clear manual inline pixel drag positions so corner preset class takes over
+      signPipContainer.style.left = '';
+      signPipContainer.style.top = '';
+      signPipContainer.style.bottom = '';
+      signPipContainer.style.right = '';
       signPipContainer.className = `sign-pip-container sign-size-${this.signSize} sign-pos-${this.signPosition} ${this.signVisible ? '' : 'hidden'}`;
       statusEl.textContent = `Sign window: ${pos}`;
       this.dispatchPrefs();
@@ -1447,6 +1490,8 @@ class DbPlayer extends HTMLElement {
     const sizeToggleBtn = this.shadowRoot.querySelector('#btn-size-toggle');
     if (sizeToggleBtn) {
       sizeToggleBtn.addEventListener('click', () => {
+        // Clear manual custom inline width so preset cycles
+        signPipContainer.style.width = '';
         const sizes = ['small', 'medium', 'large'];
         const nextIdx = (sizes.indexOf(this.signSize) + 1) % sizes.length;
         this.signSize = sizes[nextIdx];
@@ -1456,6 +1501,105 @@ class DbPlayer extends HTMLElement {
         this.dispatchPrefs();
       });
     }
+
+    // Free Pointer Dragging (Move anywhere across the video)
+    const dragHeader = this.shadowRoot.querySelector('#sign-drag-header');
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let containerStartLeft = 0;
+    let containerStartTop = 0;
+
+    dragHeader?.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button')) return; // Allow buttons in header to be clicked
+
+      isDragging = true;
+      dragHeader.setPointerCapture(e.pointerId);
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const containerRect = signPipContainer.getBoundingClientRect();
+
+      containerStartLeft = containerRect.left - wrapperRect.left;
+      containerStartTop = containerRect.top - wrapperRect.top;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+
+      signPipContainer.style.transition = 'none';
+      signPipContainer.style.left = `${containerStartLeft}px`;
+      signPipContainer.style.top = `${containerStartTop}px`;
+      signPipContainer.style.bottom = 'auto';
+      signPipContainer.style.right = 'auto';
+    });
+
+    dragHeader?.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const deltaX = e.clientX - dragStartX;
+      const deltaY = e.clientY - dragStartY;
+
+      let newLeft = containerStartLeft + deltaX;
+      let newTop = containerStartTop + deltaY;
+
+      const maxLeft = wrapperRect.width - signPipContainer.offsetWidth;
+      const maxTop = wrapperRect.height - signPipContainer.offsetHeight;
+
+      newLeft = Math.max(0, Math.min(maxLeft, newLeft));
+      newTop = Math.max(0, Math.min(maxTop, newTop));
+
+      signPipContainer.style.left = `${newLeft}px`;
+      signPipContainer.style.top = `${newTop}px`;
+    });
+
+    const stopDragging = (e) => {
+      if (isDragging) {
+        isDragging = false;
+        try { dragHeader.releasePointerCapture(e.pointerId); } catch (_) {}
+        signPipContainer.style.transition = '';
+      }
+    };
+    dragHeader?.addEventListener('pointerup', stopDragging);
+    dragHeader?.addEventListener('pointercancel', stopDragging);
+
+    // Free Pointer Resizing (Handle in bottom-right corner)
+    const resizeHandle = this.shadowRoot.querySelector('#sign-resize-handle');
+    let isResizing = false;
+    let resizeStartX = 0;
+    let containerStartWidth = 0;
+
+    resizeHandle?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing = true;
+      resizeHandle.setPointerCapture(e.pointerId);
+
+      resizeStartX = e.clientX;
+      containerStartWidth = signPipContainer.offsetWidth;
+      signPipContainer.style.transition = 'none';
+    });
+
+    resizeHandle?.addEventListener('pointermove', (e) => {
+      if (!isResizing) return;
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const deltaX = e.clientX - resizeStartX;
+      let newWidth = containerStartWidth + deltaX;
+
+      const minWidth = 140;
+      const maxWidth = Math.max(300, wrapperRect.width * 0.85);
+
+      newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+      signPipContainer.style.width = `${newWidth}px`;
+    });
+
+    const stopResizing = (e) => {
+      if (isResizing) {
+        isResizing = false;
+        try { resizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+        signPipContainer.style.transition = '';
+      }
+    };
+    resizeHandle?.addEventListener('pointerup', stopResizing);
+    resizeHandle?.addEventListener('pointercancel', stopResizing);
 
     // -------------------------------------------------------------
     // TRANSCRIPT & AUDIO-FIRST READ ALOUD ENGINE
