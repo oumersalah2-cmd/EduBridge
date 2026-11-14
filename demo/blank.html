@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduBridge — Standalone Web Component Proof (Outside Savanna)</title>
+    <style>
+      :focus-visible {
+        outline: 3px solid #f5a300;
+        outline-offset: 3px;
+      }
+      body {
+        margin: 0;
+        padding: 2rem;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        background-color: #f8fafc;
+        color: #0f172a;
+      }
+      .skip-link {
+        position: absolute;
+        top: -100px;
+        left: 1rem;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 0.5rem 1rem;
+        font-weight: 700;
+        text-decoration: underline;
+        z-index: 1000;
+      }
+      .skip-link:focus {
+        top: 1rem;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 2.5rem;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+      }
+      header {
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 1.5rem;
+        margin-bottom: 2rem;
+      }
+      h1 {
+        font-size: 2rem;
+        margin: 0 0 0.5rem 0;
+        color: #0f172a;
+      }
+      .subtitle {
+        font-size: 1.1rem;
+        color: #475569;
+        margin: 0;
+      }
+      .proof-badge {
+        display: inline-block;
+        background-color: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-weight: 600;
+        margin-top: 0.5rem;
+      }
+      .instructions {
+        background-color: #f1f5f9;
+        border-left: 4px solid #005fcc;
+        padding: 1rem 1.5rem;
+        margin: 1.5rem 0;
+        border-radius: 0 4px 4px 0;
+      }
+      .instructions code {
+        background: #e2e8f0;
+        padding: 0.15rem 0.4rem;
+        border-radius: 3px;
+        font-size: 0.95em;
+      }
+      .player-container {
+        margin: 2rem 0;
+      }
+      .event-log-container {
+        margin-top: 2rem;
+        padding: 1rem;
+        background: #0f172a;
+        color: #f8fafc;
+        border-radius: 6px;
+        font-family: monospace;
+      }
+      .event-log-container h2 {
+        color: #93c5fd;
+        font-size: 1rem;
+        margin-top: 0;
+      }
+      #event-log {
+        max-height: 140px;
+        overflow-y: auto;
+        font-size: 0.85rem;
+        line-height: 1.4;
+      }
+    </style>
+    <!-- 1. Load the module script -->
+    <script src="../player/db-player.js" defer></script>
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <main id="main-content" tabindex="-1">
+      <header>
+        <h1>EduBridge Accessible Media Player</h1>
+        <p class="subtitle">Proof 1: Outside Savanna (Zero Bootstrap / Standalone Isolation)</p>
+        <span class="proof-badge" role="status">✓ Pure Web Component + Shadow DOM</span>
+      </header>
+
+      <section class="instructions" aria-label="Proof Instructions">
+        <strong>Judge & Co-Designer Verification:</strong>
+        <p>
+          This page proves <code>&lt;db-player&gt;</code> operates autonomously without any host CSS or framework dependencies. 
+          Use <code>Space</code>/<code>K</code> to play/pause, <code>S</code> for Ethiopian Sign Language window, <code>C</code> for captions, and <code>?</code> for keyboard shortcut assistance.
+        </p>
+      </section>
+
+      <!-- 2. Place the module Web Component -->
+      <section class="player-container" aria-label="Media Player Mount Point">
+        <db-player
+          src="./data/lesson.mp4"
+          captions="./data/lesson.en.vtt,./data/lesson.am.vtt"
+          sign="./data/lesson.ethsl.mp4"
+          lang="am"
+          api="http://localhost:4000/api"
+        ></db-player>
+      </section>
+
+      <!-- 3. Proof of custom event dispatching to host -->
+      <section class="event-log-container" aria-label="Host Event Dispatch Log">
+        <h2>Host Event Listener Log (dispatchEvent proof):</h2>
+        <div id="event-log" role="log" aria-live="polite">Waiting for player events...</div>
+      </section>
+    </main>
+
+    <script>
+      // Host page event listener verification
+      const logEl = document.getElementById('event-log');
+      function logEvent(name, detail) {
+        const item = document.createElement('div');
+        item.textContent = `[${new Date().toLocaleTimeString()}] Event: ${name} -> ${JSON.stringify(detail)}`;
+        logEl.prepend(item);
+      }
+
+      document.addEventListener('db-player:progress', (e) => logEvent('db-player:progress', e.detail));
+      document.addEventListener('db-player:prefs', (e) => logEvent('db-player:prefs', e.detail));
+      document.addEventListener('db-player:complete', (e) => logEvent('db-player:complete', e.detail));
+    </script>
+  </body>
+</html>
+
