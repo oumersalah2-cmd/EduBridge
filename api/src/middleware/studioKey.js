@@ -7,13 +7,22 @@ function studioKeyMiddleware(req, res, next) {
 
   if (!configuredKey) {
     return res.status(500).json({
-      error: 'Studio authentication is not configured on the server. Please verify environment settings.'
+      error: 'Studio authentication is not configured on the server. Please verify environment settings.',
+      code: 'AUTH_NOT_CONFIGURED'
     });
   }
 
-  if (!providedKey || providedKey !== configuredKey) {
+  if (!providedKey) {
     return res.status(401).json({
-      error: 'Unauthorized: Invalid or missing X-Studio-Key header. Access to studio write operations requires a valid key.'
+      error: 'Unauthorized: Invalid or missing X-Studio-Key header. Access to studio write operations requires a valid key.',
+      code: 'KEY_REQUIRED'
+    });
+  }
+
+  if (providedKey !== configuredKey) {
+    return res.status(401).json({
+      error: 'Unauthorized: Invalid or missing X-Studio-Key header. Access to studio write operations requires a valid key.',
+      code: 'KEY_INVALID'
     });
   }
 

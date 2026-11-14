@@ -6,7 +6,9 @@
 function getPublicBaseUrl(req) {
   let base = process.env.PUBLIC_BASE_URL;
   if (!base && req) {
-    base = `${req.protocol}://${req.get('host')}`;
+    const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+    const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:4000';
+    base = `${proto}://${host}`;
   }
   base = base || 'http://localhost:4000';
   return base.replace(/\/+$/, '');

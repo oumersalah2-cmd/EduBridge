@@ -17,6 +17,8 @@ const CaptionTrackSchema = new mongoose.Schema({
 }, { _id: false });
 
 const VideoSchema = new mongoose.Schema({
+  customId: { type: String, index: true },
+  isDemo: { type: Boolean, default: false },
   title: { type: String, default: 'Untitled Lesson' },
   status: {
     type: String,
@@ -39,6 +41,11 @@ const VideoSchema = new mongoose.Schema({
   mp3Path: { type: String },
   audioPath: { type: String },
   audioUrl: { type: String },
+  audioDescriptionPath: { type: String, default: null },
+  audioDescriptionUrl: { type: String, default: null },
+  offlinePackPath: { type: String },
+  offlinePackUrl: { type: String },
+  offlinePackSizeBytes: { type: Number, default: 0 },
 
   // Captions & Transcripts
   captions: {
