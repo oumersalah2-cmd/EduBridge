@@ -40,6 +40,8 @@ async function startServer() {
         serverSelectionTimeoutMS: 3000,
       });
       console.log(`Connected to MongoDB at ${MONGO_URL}`);
+      const { seedDatabaseIfEmpty } = require('../scripts/seed-demo');
+      await seedDatabaseIfEmpty();
     } catch (err) {
       console.warn(`MongoDB connection warning: ${err.message}. Starting in offline/standalone mode.`);
     }

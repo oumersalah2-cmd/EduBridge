@@ -199,6 +199,35 @@ class PipelineQueue {
     video.transcript = transcriptText;
     video.transcriptText = transcriptText;
 
+    // Amharic Human First: AMHARIC_MODE=direct (Whisper language am as draft) or off (no am track until human submits)
+    const amharicMode = process.env.AMHARIC_MODE || 'off';
+    if (amharicMode === 'direct') {
+      try {
+        console.log('[Pipeline] Generating Amharic draft caption track via Whisper...');
+        const amResult = await whisperService.transcribeAudio(wavPath, {
+          model: process.env.WHISPER_MODEL || 'base',
+          language: 'am'
+        });
+        const amSegments = amResult.segments || [];
+        if (amSegments.length > 0) {
+          const amVttContent = vttConverter.segmentsToWebVTT(amSegments);
+          const amVttFilename = `${video._id}_am.vtt`;
+          const amVttPath = path.join(CAPTIONS_DIR, amVttFilename);
+          fs.writeFileSync(amVttPath, amVttContent, 'utf8');
+
+          video.captions.am = {
+            vttPath: amVttPath,
+            vttUrl: `/uploads/captions/${amVttFilename}`,
+            status: 'machine-generated',
+            reviewStatus: 'machine-generated'
+          };
+          video.markModified('captions');
+        }
+      } catch (amErr) {
+        console.warn('[Pipeline] Amharic draft transcription skipped or failed:', amErr.message);
+      }
+    }
+
     // Step 6: Review ready at 100%
     await this.updateVideoState(video, {
       status: 'review',
