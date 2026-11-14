@@ -1,0 +1,32 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    environment:
+      PORT: ${PORT:-4000}
+      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/edubridge}
+      HF_HOME: /root/.cache/huggingface
+    ports:
+      - "${PORT:-4000}:${PORT:-4000}"
+    volumes:
+      - api-uploads:/app/uploads
+      - whisper-cache:/root/.cache/huggingface
+
+volumes:
+  mongo-data:
+  api-uploads:
+  whisper-cache:
