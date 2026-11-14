@@ -2,12 +2,14 @@
  * EduBridge Accessible Media Player (<db-player>)
  * Track 2: Accessible Learning Media — Digital Bridge Hackathon 2026
  *
- * Requirements Met in this Version:
+ * Requirements Met in this Version (Steps 1, 2 & 3):
  * - One tag: <db-player src="..." captions="..." sign="..." describe="..." lang="am" api="..."></db-player>
  * - Custom WebVTT parser & high-contrast cue renderer (never relies on un-stylable native browser captions).
  * - Full bilingual support (English & Amharic Ethiopic typography with 1.7 line-height).
  * - Caption customization: font sizes (100%, 125%, 150%, 200%) and 3 high-contrast color themes.
  * - Human-reviewed vs Machine-generated verification badge.
+ * - Full keyboard operation without traps (WCAG 2.1.1, 2.1.2, 2.1.4): Space/K, Left/Right arrows, M, C, S, F, ?.
+ * - Native <dialog> element for Keyboard Help with focus retention (Escape closes, focus returns).
  * - Semantic controls, 44x44px touch targets, 3px solid focus indicators, screen reader live region.
  * - Emits db-player:progress, db-player:complete, and db-player:prefs.
  */
@@ -162,7 +164,7 @@ class DbPlayer extends HTMLElement {
         signLanguage: "Ethiopian Sign Language",
         fullscreen: "Full screen",
         shortcuts: "Keyboard help",
-        statusReady: "Player ready. Space to play, C for captions, question mark for keyboard shortcuts.",
+        statusReady: "Player ready. Space or K to play, Left/Right to seek, ? for help.",
         statusPlaying: "Playing video",
         statusPaused: "Video paused",
         langEn: "English Captions",
@@ -174,7 +176,18 @@ class DbPlayer extends HTMLElement {
         themeBlackYellow: "Black on Yellow",
         badgeReviewed: "Human Reviewed",
         badgeMachine: "Machine Generated",
-        closeSettings: "Close Settings"
+        closeSettings: "Close Settings",
+        shortcutsHeading: "Keyboard Shortcuts Guide",
+        shortcutsIntro: "You can control all player features with keyboard shortcuts without using a mouse:",
+        kSpace: "Play or pause the lesson",
+        kArrows: "Rewind or forward 10 seconds",
+        kM: "Mute or unmute audio",
+        kC: "Toggle captions on or off",
+        kS: "Toggle Ethiopian Sign Language PIP window",
+        kF: "Toggle full-screen viewing",
+        kQuestion: "Open or close this keyboard shortcuts dialog",
+        kEscape: "Close any dialog and return to player",
+        closeDialog: "Close"
       },
       am: {
         playerTitle: "ኤዱብሪጅ ተደራሽ የሚዲያ ማጫወቻ",
@@ -191,7 +204,7 @@ class DbPlayer extends HTMLElement {
         signLanguage: "የኢትዮጵያ የምልክት ቋንቋ",
         fullscreen: "ሙሉ ማያ",
         shortcuts: "የቁልፍ ሰሌዳ እገዛ",
-        statusReady: "ማጫወቻው ዝግጁ ነው። ለማጫወት Space፣ ለትርጉም ጽሑፍ C፣ ለእገዛ ? ይጫኑ።",
+        statusReady: "ማጫወቻው ዝግጁ ነው። ለማጫወት Space ወይም K፣ ወደ ኋላ/ፊት የቀስት ቁልፎች፣ ለእገዛ ? ይጫኑ።",
         statusPlaying: "ቪዲዮ በመጫወት ላይ",
         statusPaused: "ቪዲዮ ቆሟል",
         langEn: "እንግሊዝኛ የትርጉም ጽሑፍ",
@@ -203,7 +216,18 @@ class DbPlayer extends HTMLElement {
         themeBlackYellow: "ጥቁር በቢጫ ላይ",
         badgeReviewed: "በሰው የተገመገመ",
         badgeMachine: "በማሽን የተፈጠረ",
-        closeSettings: "ቅንብሮችን ዝጋ"
+        closeSettings: "ቅንብሮችን ዝጋ",
+        shortcutsHeading: "የቁልፍ ሰሌዳ አቋራጮች መመሪያ",
+        shortcutsIntro: "ያለ ማውዝ በቁልፍ ሰሌዳ ብቻ ማጫወቻውን ሙሉ በሙሉ መጠቀም ይችላሉ፦",
+        kSpace: "ቪዲዮውን ለማጫወት ወይም ለማቆም",
+        kArrows: "10 ሰከንድ ወደ ኋላ ወይም ወደ ፊት ለመሄድ",
+        kM: "ድምጽ ለማጥፋት ወይም ለማብራት",
+        kC: "የትርጉም ጽሑፍ ለማብራት ወይም ለማጥፋት",
+        kS: "የምልክት ቋንቋ መስኮት ለማብራት ወይም ለማጥፋት",
+        kF: "ቪዲዮውን በሙሉ ማያ ለማየት",
+        kQuestion: "ይህን የቁልፍ ሰሌዳ አቋራጭ መስኮት ለመክፈት",
+        kEscape: "መስኮቶችን ዘግቶ ወደ ማጫወቻው ለመመለስ",
+        closeDialog: "ዝጋ"
       }
     };
 
@@ -284,7 +308,6 @@ class DbPlayer extends HTMLElement {
           visibility: hidden;
         }
 
-        /* Verification Badge Header */
         .caption-badge-wrapper {
           margin-bottom: 6px;
         }
@@ -297,7 +320,6 @@ class DbPlayer extends HTMLElement {
           border-radius: 4px;
           font-size: 0.75rem;
           font-weight: 700;
-          letter-spacing: 0.02em;
           background-color: #064e3b;
           color: #a7f3d0;
           border: 1px solid #059669;
@@ -316,7 +338,6 @@ class DbPlayer extends HTMLElement {
           border: 1px solid #d97706;
         }
 
-        /* Cue Text Box */
         .caption-box {
           display: inline-block;
           max-width: 90%;
@@ -333,13 +354,11 @@ class DbPlayer extends HTMLElement {
           font-family: var(--bs-body-font-family, system-ui, "Noto Sans Ethiopic", sans-serif);
         }
 
-        /* Sizing Presets */
         .size-100 { font-size: 1.1rem; }
         .size-125 { font-size: 1.35rem; }
         .size-150 { font-size: 1.65rem; }
         .size-200 { font-size: 2.1rem; }
 
-        /* High-Contrast Themes */
         .theme-white-black {
           background-color: rgba(0, 0, 0, 0.9);
           color: #ffffff;
@@ -359,7 +378,7 @@ class DbPlayer extends HTMLElement {
         }
 
         /* -------------------------------------------------------------
-           CAPTION SETTINGS POPUP MODAL (Keyboard & Screen-Reader Accessible)
+           CAPTION SETTINGS POPUP MODAL
            ------------------------------------------------------------- */
         .caption-settings-panel {
           position: absolute;
@@ -397,6 +416,10 @@ class DbPlayer extends HTMLElement {
 
         .settings-group {
           margin-bottom: 0.85rem;
+          border: 0;
+          padding: 0;
+          margin-inline-start: 0;
+          margin-inline-end: 0;
         }
 
         .settings-group legend {
@@ -432,6 +455,85 @@ class DbPlayer extends HTMLElement {
         .btn-option:focus-visible {
           outline: 3px solid #f5a300;
           outline-offset: 2px;
+        }
+
+        /* -------------------------------------------------------------
+           KEYBOARD SHORTCUTS ACCESSIBLE MODAL (<dialog>)
+           ------------------------------------------------------------- */
+        dialog.shortcuts-modal {
+          border: 2px solid #374151;
+          border-radius: 10px;
+          background: #111827;
+          color: #ffffff;
+          padding: 1.5rem;
+          max-width: 520px;
+          width: 90%;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+          z-index: 100;
+        }
+
+        dialog.shortcuts-modal::backdrop {
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(2px);
+        }
+
+        .dialog-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+          padding-bottom: 0.5rem;
+          border-bottom: 1px solid #374151;
+        }
+
+        .dialog-header h2 {
+          margin: 0;
+          font-size: 1.25rem;
+          color: #f3f4f6;
+        }
+
+        .shortcuts-list {
+          list-style: none;
+          padding: 0;
+          margin: 0 0 1.5rem 0;
+        }
+
+        .shortcuts-list li {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.6rem 0;
+          border-bottom: 1px solid #1f2937;
+          font-size: 0.95rem;
+        }
+
+        .kbd-badge {
+          display: inline-block;
+          padding: 0.25rem 0.5rem;
+          font-size: 0.85rem;
+          font-family: monospace;
+          background-color: #1f2937;
+          border: 1px solid #4b5563;
+          border-radius: 4px;
+          color: #93c5fd;
+          font-weight: 700;
+        }
+
+        .btn-dialog-close {
+          width: 100%;
+          min-height: 44px;
+          background: var(--bs-primary, #005fcc);
+          color: #ffffff;
+          border: 0;
+          border-radius: 6px;
+          font-size: 1rem;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .btn-dialog-close:focus-visible {
+          outline: 3px solid #f5a300;
+          outline-offset: 3px;
         }
 
         /* -------------------------------------------------------------
@@ -536,9 +638,8 @@ class DbPlayer extends HTMLElement {
         <div 
           id="caption-settings-panel" 
           class="caption-settings-panel hidden" 
-          role="dialog" 
-          aria-labelledby="settings-heading" 
-          aria-modal="false">
+          role="region" 
+          aria-labelledby="settings-heading">
           
           <div class="settings-header">
             <h3 id="settings-heading">${t.captionsMenu}</h3>
@@ -577,6 +678,50 @@ class DbPlayer extends HTMLElement {
           </fieldset>
         </div>
 
+        <!-- Accessible Keyboard Shortcuts Dialog (<dialog>) -->
+        <dialog id="shortcuts-dialog" class="shortcuts-modal" aria-labelledby="dialog-title">
+          <div class="dialog-header">
+            <h2 id="dialog-title">${t.shortcutsHeading}</h2>
+            <button type="button" class="btn-option" id="btn-dialog-x" aria-label="${t.closeDialog}">✕</button>
+          </div>
+          <p style="color: #d1d5db; margin-top: 0; font-size: 0.95rem;">${t.shortcutsIntro}</p>
+          <ul class="shortcuts-list">
+            <li>
+              <span>${t.kSpace}</span>
+              <kbd class="kbd-badge">Space / K</kbd>
+            </li>
+            <li>
+              <span>${t.kArrows}</span>
+              <kbd class="kbd-badge">← / →</kbd>
+            </li>
+            <li>
+              <span>${t.kM}</span>
+              <kbd class="kbd-badge">M</kbd>
+            </li>
+            <li>
+              <span>${t.kC}</span>
+              <kbd class="kbd-badge">C</kbd>
+            </li>
+            <li>
+              <span>${t.kS}</span>
+              <kbd class="kbd-badge">S</kbd>
+            </li>
+            <li>
+              <span>${t.kF}</span>
+              <kbd class="kbd-badge">F</kbd>
+            </li>
+            <li>
+              <span>${t.kQuestion}</span>
+              <kbd class="kbd-badge">?</kbd>
+            </li>
+            <li>
+              <span>${t.kEscape}</span>
+              <kbd class="kbd-badge">Esc</kbd>
+            </li>
+          </ul>
+          <button type="button" class="btn-dialog-close" id="btn-dialog-close">${t.closeDialog}</button>
+        </dialog>
+
         <!-- Semantic Accessible Controls Bar -->
         <nav class="controls-bar" aria-label="Media controls">
           <!-- Play / Pause -->
@@ -614,8 +759,7 @@ class DbPlayer extends HTMLElement {
             id="btn-captions" 
             aria-label="${t.captionsMenu}" 
             aria-pressed="${this.captionsVisible}"
-            aria-expanded="false"
-            aria-haspopup="dialog">
+            aria-expanded="false">
             <span aria-hidden="true">CC</span>
           </button>
 
@@ -641,6 +785,7 @@ class DbPlayer extends HTMLElement {
   }
 
   setupEventListeners() {
+    const wrapper = this.shadowRoot.querySelector('.player-wrapper');
     const video = this.shadowRoot.querySelector('video.main-video');
     const playBtn = this.shadowRoot.querySelector('#btn-play');
     const playIcon = this.shadowRoot.querySelector('#play-icon');
@@ -658,6 +803,10 @@ class DbPlayer extends HTMLElement {
     const captionsBtn = this.shadowRoot.querySelector('#btn-captions');
     const settingsPanel = this.shadowRoot.querySelector('#caption-settings-panel');
     const closeSettingsBtn = this.shadowRoot.querySelector('#btn-close-settings');
+    const helpBtn = this.shadowRoot.querySelector('#btn-help');
+    const shortcutsDialog = this.shadowRoot.querySelector('#shortcuts-dialog');
+    const dialogCloseBtn = this.shadowRoot.querySelector('#btn-dialog-close');
+    const dialogXBtn = this.shadowRoot.querySelector('#btn-dialog-x');
     const t = this.i18n;
 
     const formatTime = (seconds) => {
@@ -694,9 +843,7 @@ class DbPlayer extends HTMLElement {
       statusEl.textContent = t.statusPaused;
     });
 
-    // -------------------------------------------------------------
-    // REAL-TIME CUE SYNCHRONIZATION
-    // -------------------------------------------------------------
+    // Cue synchronization
     video.addEventListener('timeupdate', () => {
       const currentTime = video.currentTime;
       currentTimeEl.textContent = formatTime(currentTime);
@@ -711,7 +858,6 @@ class DbPlayer extends HTMLElement {
         }
       }));
 
-      // Find active cue in selected language
       if (this.captionsVisible) {
         const activeTrack = this.captionTracks[this.captionLang] || [];
         const activeCue = activeTrack.find((c) => currentTime >= c.start && currentTime <= c.end);
@@ -738,30 +884,27 @@ class DbPlayer extends HTMLElement {
       }));
     });
 
-    // Seek buttons
-    backBtn.addEventListener('click', () => {
-      video.currentTime = Math.max(0, video.currentTime - 10);
-      statusEl.textContent = `${t.seekBack}: ${formatTime(video.currentTime)}`;
-    });
+    // Seek actions
+    const seekRelative = (delta) => {
+      video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + delta));
+      statusEl.textContent = `${delta < 0 ? t.seekBack : t.seekForward}: ${formatTime(video.currentTime)}`;
+    };
 
-    fwdBtn.addEventListener('click', () => {
-      video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
-      statusEl.textContent = `${t.seekForward}: ${formatTime(video.currentTime)}`;
-    });
+    backBtn.addEventListener('click', () => seekRelative(-10));
+    fwdBtn.addEventListener('click', () => seekRelative(10));
 
-    // Mute toggle
-    muteBtn.addEventListener('click', () => {
+    // Mute toggle action
+    const toggleMute = () => {
       video.muted = !video.muted;
       this.isMuted = video.muted;
       muteIcon.textContent = video.muted ? '🔇' : '🔊';
       muteBtn.setAttribute('aria-label', video.muted ? t.unmute : t.mute);
       statusEl.textContent = video.muted ? t.mute : t.unmute;
-    });
+    };
+    muteBtn.addEventListener('click', toggleMute);
 
-    // Fullscreen toggle
-    const fsBtn = this.shadowRoot.querySelector('#btn-fullscreen');
-    fsBtn.addEventListener('click', () => {
-      const wrapper = this.shadowRoot.querySelector('.player-wrapper');
+    // Fullscreen toggle action
+    const toggleFullscreen = () => {
       if (!document.fullscreenElement) {
         if (wrapper.requestFullscreen) {
           wrapper.requestFullscreen();
@@ -770,6 +913,104 @@ class DbPlayer extends HTMLElement {
         if (document.exitFullscreen) {
           document.exitFullscreen();
         }
+      }
+    };
+    const fsBtn = this.shadowRoot.querySelector('#btn-fullscreen');
+    fsBtn.addEventListener('click', toggleFullscreen);
+
+    // -------------------------------------------------------------
+    // ACCESSIBLE KEYBOARD SHORTCUTS ENGINE (WCAG 2.1.1, 2.1.4)
+    // -------------------------------------------------------------
+    const openHelpDialog = () => {
+      if (shortcutsDialog && typeof shortcutsDialog.showModal === 'function') {
+        shortcutsDialog.showModal();
+        dialogCloseBtn.focus();
+        statusEl.textContent = t.shortcutsHeading;
+      }
+    };
+
+    const closeHelpDialog = () => {
+      if (shortcutsDialog && shortcutsDialog.open) {
+        shortcutsDialog.close();
+        helpBtn.focus();
+        statusEl.textContent = t.closeDialog;
+      }
+    };
+
+    helpBtn.addEventListener('click', openHelpDialog);
+    dialogCloseBtn.addEventListener('click', closeHelpDialog);
+    dialogXBtn.addEventListener('click', closeHelpDialog);
+
+    // Global keyboard listener scoped to the component
+    this.addEventListener('keydown', (e) => {
+      // Do not trigger shortcuts if user is typing in an input
+      const targetTag = e.target.tagName ? e.target.tagName.toLowerCase() : '';
+      if (targetTag === 'input' || targetTag === 'textarea' || e.target.isContentEditable) {
+        return;
+      }
+
+      // If shortcuts dialog is open, let Escape close it
+      if (shortcutsDialog && shortcutsDialog.open) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeHelpDialog();
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case ' ':
+        case 'k':
+        case 'K':
+          e.preventDefault();
+          togglePlay();
+          break;
+
+        case 'ArrowLeft':
+          e.preventDefault();
+          seekRelative(-10);
+          break;
+
+        case 'ArrowRight':
+          e.preventDefault();
+          seekRelative(10);
+          break;
+
+        case 'm':
+        case 'M':
+          e.preventDefault();
+          toggleMute();
+          break;
+
+        case 'c':
+        case 'C':
+          e.preventDefault();
+          this.captionsVisible = !this.captionsVisible;
+          captionContainer.classList.toggle('hidden', !this.captionsVisible);
+          captionsBtn.setAttribute('aria-pressed', this.captionsVisible ? 'true' : 'false');
+          statusEl.textContent = this.captionsVisible ? t.captionsOn : t.captionsOff;
+          this.dispatchPrefs();
+          break;
+
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+
+        case '?':
+          e.preventDefault();
+          openHelpDialog();
+          break;
+
+        case 'Escape':
+          if (!settingsPanel.classList.contains('hidden')) {
+            e.preventDefault();
+            settingsPanel.classList.add('hidden');
+            captionsBtn.setAttribute('aria-expanded', 'false');
+            captionsBtn.focus();
+          }
+          break;
       }
     });
 
