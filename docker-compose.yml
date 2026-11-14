@@ -41,6 +41,7 @@ services:
       - ./savanna:/usr/share/nginx/html/savanna:ro
       - ./module:/usr/share/nginx/html/module:ro
       - ./demo:/usr/share/nginx/html/demo:ro
+      - ./studio/dist:/usr/share/nginx/html/studio:ro
 
 volumes:
   mongo-data:

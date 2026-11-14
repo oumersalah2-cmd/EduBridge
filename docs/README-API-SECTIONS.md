@@ -198,3 +198,4 @@ Every error response adheres to the contract:
 | `INVALID_LANGUAGE` | 400 | Requested or submitted language not supported |
 | `RATE_LIMIT_EXCEEDED` | 429 | IP has exceeded request rate limit |
 | `NOT_FOUND` | 404 | Route or endpoint not recognized |
+
