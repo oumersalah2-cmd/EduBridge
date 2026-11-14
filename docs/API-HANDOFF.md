@@ -121,7 +121,7 @@ eventSource.onerror = (err) => {
 
 ## 6. Curl Reference for Every Endpoint
 
-*Note: Replace `secret-studio-key` with the value from your `.env` `STUDIO_KEY`.*
+*Note: Default key in `.env.example` is `change-me-to-a-long-random-string`.*
 
 ### Health & Docs
 ```bash
@@ -130,36 +130,43 @@ curl -s http://localhost:4000/api/health
 
 # OpenAPI Swagger UI
 curl -s http://localhost:4000/api/docs/
+
+# OpenAPI JSON Specification
+curl -s http://localhost:4000/api/openapi.json
 ```
 
 ### Video Studio & Processing Routes
 ```bash
 # 1. Upload Video (Requires X-Studio-Key, multipart)
 curl -s -X POST http://localhost:4000/api/videos \
-  -H "X-Studio-Key: secret-studio-key" \
+  -H "X-Studio-Key: change-me-to-a-long-random-string" \
   -F "video=@sample.mp4"
 
 # 2. Poll Processing Progress (For aria-live progress updates)
 curl -s http://localhost:4000/api/videos/mock-video-demo-01
 
+# 2b. Studio Lesson Preview with Raw Captions (Requires X-Studio-Key, all statuses except failed)
+curl -s http://localhost:4000/api/videos/mock-video-demo-01/preview \
+  -H "X-Studio-Key: change-me-to-a-long-random-string"
+
 # 3. Save Human-Edited WebVTT (Resets review status to machine-generated)
 curl -s -X PUT http://localhost:4000/api/videos/mock-video-demo-01/captions/en \
-  -H "X-Studio-Key: secret-studio-key" \
+  -H "X-Studio-Key: change-me-to-a-long-random-string" \
   -H "Content-Type: text/vtt" \
   -d $'WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nTeacher: Welcome to class.'
 
 # 4. Approve Caption Track (Marks reviewStatus: human-reviewed)
 curl -s -X POST http://localhost:4000/api/videos/mock-video-demo-01/approve/en \
-  -H "X-Studio-Key: secret-studio-key"
+  -H "X-Studio-Key: change-me-to-a-long-random-string"
 
 # 5. Publish Lesson (Builds offline pack & returns embed snippets)
 curl -s -X POST http://localhost:4000/api/videos/mock-video-demo-01/publish \
-  -H "X-Studio-Key: secret-studio-key"
+  -H "X-Studio-Key: change-me-to-a-long-random-string"
 ```
 
 ### Public Lesson & Offline Pack Routes
 ```bash
-# 6. Get Public Lesson Metadata (Captions, transcript, audio link)
+# 6. Get Public Lesson Metadata (Captions, transcript, video link, audio link - published only)
 curl -s http://localhost:4000/api/public/videos/mock-video-demo-01
 
 # 7. Download 3G Offline ZIP Bundle (audio.mp3, transcript.txt, lesson.html, lesson.brf)
@@ -170,20 +177,20 @@ curl -s -O http://localhost:4000/api/public/videos/mock-video-demo-01/offlinepac
 ```bash
 # 8. Create Live Classroom Session (Generates 6-digit PIN)
 curl -s -X POST http://localhost:4000/api/live/sessions \
-  -H "X-Studio-Key: secret-studio-key"
+  -H "X-Studio-Key: change-me-to-a-long-random-string"
 
 # 9. Connect to Live SSE Stream (Public)
 curl -N -s http://localhost:4000/api/live/sessions/620942/stream
 
 # 10. Broadcast Teacher Speech Captions
 curl -s -X POST http://localhost:4000/api/live/sessions/620942/captions \
-  -H "X-Studio-Key: secret-studio-key" \
+  -H "X-Studio-Key: change-me-to-a-long-random-string" \
   -H "Content-Type: application/json" \
   -d '{"text": "Now let us examine the solar cell diagram.", "isFinal": true, "ts": 1700000000000}'
 
 # 11. Broadcast Teacher Board Notes
 curl -s -X POST http://localhost:4000/api/live/sessions/620942/board \
-  -H "X-Studio-Key: secret-studio-key" \
+  -H "X-Studio-Key: change-me-to-a-long-random-string" \
   -H "Content-Type: application/json" \
   -d '{"text": "Key Concept: Photovoltaic effect converts photons into electrons."}'
 
@@ -194,15 +201,15 @@ curl -s -X POST http://localhost:4000/api/live/sessions/620942/questions \
 
 # 13. Teacher Question Queue View
 curl -s http://localhost:4000/api/live/sessions/620942/questions \
-  -H "X-Studio-Key: secret-studio-key"
+  -H "X-Studio-Key: change-me-to-a-long-random-string"
 
 # 14. Dismiss Question (Spam control / answered)
 curl -s -X DELETE http://localhost:4000/api/live/sessions/620942/questions/q-mock-1 \
-  -H "X-Studio-Key: secret-studio-key"
+  -H "X-Studio-Key: change-me-to-a-long-random-string"
 
 # 15. End Live Session (Archives into permanent recorded lesson)
 curl -s -X POST http://localhost:4000/api/live/sessions/620942/end \
-  -H "X-Studio-Key: secret-studio-key"
+  -H "X-Studio-Key: change-me-to-a-long-random-string"
 ```
 
 ### Accessible Job Opportunities Routes
@@ -228,6 +235,14 @@ Takes a target video path as a CLI argument, validates the container with `ffpro
 ---
 
 ## 9. Changes Log
+
+### 2026-11-14 (Update 2)
+- **Direct Source Video URL**: Added `videoUrl` (absolute via `PUBLIC_BASE_URL`) to `GET /api/public/videos/:id`, `GET /api/videos/:id/preview`, mock mode, and `openapi.yaml`. In real mode it points to the uploaded video file with HTTP range support (returns `null` for live-origin or audio-only sessions).
+- **Studio Preview & Raw Captions Endpoint**: Added authenticated `GET /api/videos/:id/preview` (`X-Studio-Key`) returning the full public shape plus `rawCaptions: { en: "<vtt text>", am: "<vtt text or null>" }` for direct editing in the teacher Studio for any status except `failed` (which returns 409).
+- **Strict Public Published Guard**: Changed `GET /api/public/videos/:id` to return a plain-language 409 Conflict for any lesson that is not yet `published` (unpublished / review lessons must use the authenticated `/preview` route).
+- **OpenAPI JSON Documented**: Documented `GET /api/openapi.json` in `docs/openapi.yaml` and curl reference.
+- **Database Job Cards**: Database `/api/jobs` and `/api/jobs/:id` report directly from MongoDB; mock fallback is strictly restricted to `MOCK_API=true`.
+- **Honest Real-Mode Offline Pack**: Removed mock fallback bypass in `GET /api/public/videos/:id/offlinepack` when `MOCK_API=false`, ensuring real lessons strictly use database transcripts in generated packs.
 
 ### 2026-11-14
 - **Demo Assets Relocation**: Tracked demo assets moved from `/uploads/` to `api/assets/demo/` and served at `/assets/demo/` with git tracking exceptions; runtime user uploads remain completely gitignored in `uploads/`.
