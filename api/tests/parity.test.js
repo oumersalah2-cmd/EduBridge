@@ -200,6 +200,7 @@ describe('Contract Parity & Security Tests (Mock vs Real Mode)', () => {
         _id: new mongoose.Types.ObjectId(testObjectId),
         title: 'Accessible Renewable Energy (Parity Test)',
         status: 'published',
+        videoUrl: '/assets/demo/demo_lesson_sign.mp4',
         audioUrl: '/assets/demo/demo_lesson_64k.mp3',
         signVideoUrl: '/assets/demo/demo_lesson_sign.mp4',
         captions: {
@@ -225,6 +226,52 @@ describe('Contract Parity & Security Tests (Mock vs Real Mode)', () => {
 
       expect(realShape).toEqual(mockShape);
     });
+
+    it('GET /api/videos/:id/preview response shapes match identically (including rawCaptions)', async () => {
+      // 1. Mock Mode
+      process.env.MOCK_API = 'true';
+      const mockRes = await request(app)
+        .get('/api/videos/mock-video-demo-01/preview')
+        .set('X-Studio-Key', TEST_KEY);
+      expect(mockRes.status).toBe(200);
+      const mockShape = getShape(mockRes.body);
+
+      // 2. Real Mode
+      process.env.MOCK_API = 'false';
+      const mockDoc = {
+        _id: new mongoose.Types.ObjectId(testObjectId),
+        title: 'Accessible Renewable Energy (Parity Test)',
+        status: 'review',
+        videoUrl: '/assets/demo/demo_lesson_sign.mp4',
+        audioUrl: '/assets/demo/demo_lesson_64k.mp3',
+        signVideoUrl: '/assets/demo/demo_lesson_sign.mp4',
+        captions: {
+          en: {
+            vttUrl: '/assets/demo/demo_lesson_en.vtt',
+            reviewStatus: 'human-reviewed'
+          },
+          am: {
+            vttUrl: '/assets/demo/demo_lesson_am.vtt',
+            reviewStatus: 'machine-generated'
+          }
+        },
+        transcript: 'Full transcript for accessibility.',
+        chatLog: [],
+        offlinePackUrl: `/api/public/videos/${testObjectId}/offlinepack`,
+        brailleUrl: '/assets/demo/demo_lesson.brf'
+      };
+      jest.spyOn(Video, 'findById').mockResolvedValue(mockDoc);
+
+      const realRes = await request(app)
+        .get(`/api/videos/${testObjectId}/preview`)
+        .set('X-Studio-Key', TEST_KEY);
+      expect(realRes.status).toBe(200);
+      const realShape = getShape(realRes.body);
+
+      expect(realShape).toEqual(mockShape);
+      expect(realRes.body).toHaveProperty('rawCaptions');
+      expect(typeof realRes.body.rawCaptions).toBe('object');
+    });
   });
 
   describe('2. Real Mode Conflict (409) & Not Found (404) Guards', () => {
@@ -248,16 +295,36 @@ describe('Contract Parity & Security Tests (Mock vs Real Mode)', () => {
       expect(res.body.error).toContain('Only lessons in "review" status can be published');
     });
 
-    it('GET /api/public/videos/:id returns 409 if video is not published or review', async () => {
+    it('GET /api/public/videos/:id returns 409 if video is not published (e.g. in review)', async () => {
       const mockDoc = {
         _id: new mongoose.Types.ObjectId(testObjectId),
-        status: 'processing'
+        status: 'review'
       };
       jest.spyOn(Video, 'findById').mockResolvedValue(mockDoc);
 
       const res = await request(app).get(`/api/public/videos/${testObjectId}`);
       expect(res.status).toBe(409);
       expect(res.body.error).toContain('is not yet available for public access');
+    });
+
+    it('GET /api/videos/:id/preview rejects missing X-Studio-Key with 401', async () => {
+      const res = await request(app).get(`/api/videos/${testObjectId}/preview`);
+      expect(res.status).toBe(401);
+      expect(res.body.error).toContain('X-Studio-Key');
+    });
+
+    it('GET /api/videos/:id/preview returns 409 if video status is failed', async () => {
+      const mockDoc = {
+        _id: new mongoose.Types.ObjectId(testObjectId),
+        status: 'failed'
+      };
+      jest.spyOn(Video, 'findById').mockResolvedValue(mockDoc);
+
+      const res = await request(app)
+        .get(`/api/videos/${testObjectId}/preview`)
+        .set('X-Studio-Key', TEST_KEY);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('Preview is not available because processing failed');
     });
 
     it('GET /api/public/videos/:id returns 404 for unknown video ID', async () => {
@@ -377,6 +444,49 @@ describe('Contract Parity & Security Tests (Mock vs Real Mode)', () => {
       expect(htmlString).toContain('Noto Sans Ethiopic');
       expect(htmlString).not.toContain('http://');
       expect(htmlString).not.toContain('https://');
+    });
+
+    it('real mode offline pack uses real lesson transcript and never returns hardcoded demo text', async () => {
+      process.env.MOCK_API = 'false';
+      const realTestId = '507f191e810c19729de860ea';
+      const customTranscript = 'Photosynthesis is the biological process by which green plants convert light into chemical energy.';
+      const mockRealDoc = {
+        _id: new mongoose.Types.ObjectId(realTestId),
+        title: 'Photosynthesis and Energy Conversion',
+        status: 'published',
+        transcript: customTranscript,
+        audioUrl: '/assets/demo/demo_lesson_64k.mp3',
+        captions: {}
+      };
+      jest.spyOn(Video, 'findById').mockResolvedValue(mockRealDoc);
+
+      const res = await request(app)
+        .get(`/api/public/videos/${realTestId}/offlinepack`)
+        .buffer(true)
+        .parse((res, callback) => {
+          const chunks = [];
+          res.on('data', (chunk) => chunks.push(chunk));
+          res.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('application/zip');
+
+      const zip = readZipArchive(res.body);
+      expect(zip.entries).toContain('lesson.html');
+      expect(zip.entries).toContain('transcript.txt');
+
+      const htmlContent = zip.files['lesson.html'].toString('utf8');
+      const textContent = zip.files['transcript.txt'].toString('utf8');
+
+      // Must contain real lesson transcript
+      expect(htmlContent).toContain(customTranscript);
+      expect(textContent).toContain(customTranscript);
+
+      // Must NEVER contain the hardcoded demo text
+      const hardcodedDemoText = 'Welcome to this accessible lesson on renewable energy';
+      expect(htmlContent).not.toContain(hardcodedDemoText);
+      expect(textContent).not.toContain(hardcodedDemoText);
     });
   });
 });

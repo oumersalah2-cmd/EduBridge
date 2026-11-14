@@ -174,6 +174,7 @@ components:
         - id
         - title
         - status
+        - videoUrl
         - captions
         - transcript
         - chatLog
@@ -191,6 +192,11 @@ components:
         status:
           type: string
           example: "published"
+        videoUrl:
+          type: string
+          nullable: true
+          description: Absolute URL to uploaded source video with HTTP range support. Null for audio-only or live sessions.
+          example: "http://localhost:4000/assets/demo/demo_lesson_sign.mp4"
         audioUrl:
           type: string
           example: "http://localhost:4000/assets/demo/demo_lesson_64k.mp3"
@@ -207,6 +213,93 @@ components:
               $ref: '#/components/schemas/CaptionTrack'
             om:
               $ref: '#/components/schemas/CaptionTrack'
+        transcript:
+          type: string
+          description: Complete plain text transcription for accessibility and low-data modes.
+          example: "Welcome to this accessible lesson on renewable energy. Today we will explore solar photovoltaic cells..."
+        chatLog:
+          type: array
+          description: Log of live classroom interactions (empty for recorded studio lessons).
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+                enum: [question, board, system]
+              text:
+                type: string
+              ts:
+                type: number
+        offlinePackUrl:
+          type: string
+          example: "http://localhost:4000/api/public/videos/mock-video-demo-01/offlinepack"
+        brailleUrl:
+          type: string
+          nullable: true
+          example: "http://localhost:4000/assets/demo/demo_lesson.brf"
+
+    PreviewVideoResponse:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - videoUrl
+        - captions
+        - rawCaptions
+        - transcript
+        - chatLog
+        - audioUrl
+        - signVideoUrl
+        - offlinePackUrl
+        - brailleUrl
+      properties:
+        id:
+          type: string
+          example: "mock-video-demo-01"
+        title:
+          type: string
+          example: "Introduction to Renewable Solar Cells (Demo)"
+        status:
+          type: string
+          example: "review"
+        videoUrl:
+          type: string
+          nullable: true
+          example: "http://localhost:4000/assets/demo/demo_lesson_sign.mp4"
+        audioUrl:
+          type: string
+          example: "http://localhost:4000/assets/demo/demo_lesson_64k.mp3"
+        signVideoUrl:
+          type: string
+          nullable: true
+          example: "http://localhost:4000/assets/demo/demo_lesson_sign.mp4"
+        captions:
+          type: object
+          properties:
+            en:
+              $ref: '#/components/schemas/CaptionTrack'
+            am:
+              $ref: '#/components/schemas/CaptionTrack'
+            om:
+              $ref: '#/components/schemas/CaptionTrack'
+        rawCaptions:
+          type: object
+          description: Raw WebVTT string contents for each language track.
+          properties:
+            en:
+              type: string
+              nullable: true
+              example: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome to this accessible lesson on renewable energy."
+            am:
+              type: string
+              nullable: true
+              example: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንኳን ወደዚህ ተደራሽ የታዳሽ ኃይል ትምህርት በደህና መጡ።"
+            om:
+              type: string
+              nullable: true
         transcript:
           type: string
           description: Complete plain text transcription for accessibility and low-data modes.
@@ -401,6 +494,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/videos/{id}/preview:
+    get:
+      summary: Authenticated Studio Lesson Preview
+      description: Returns full lesson metadata and raw WebVTT caption strings for teacher review. Available for any lesson status except 'failed' (which returns 409).
+      operationId: getStudioPreview
+      security:
+        - StudioKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "mock-video-demo-01"
+      responses:
+        '200':
+          description: Studio preview metadata and raw captions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewVideoResponse'
+        '401':
+          description: Unauthorized - missing or invalid X-Studio-Key header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict - lesson processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/videos/{id}:
     get:
       summary: Poll Video Processing Progress
@@ -544,7 +677,7 @@ paths:
   /api/public/videos/{id}:
     get:
       summary: Get Public Lesson Metadata
-      description: Returns accessible lesson details, captions, transcript, and audio link. Rate-limited.
+      description: Returns accessible lesson details, captions, transcript, and audio link for published lessons. Rate-limited. Returns 409 if lesson is not published.
       operationId: getPublicVideo
       parameters:
         - name: id
@@ -561,6 +694,12 @@ paths:
                 $ref: '#/components/schemas/PublicVideoResponse'
         '404':
           description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict - lesson is not yet published (use preview endpoint with X-Studio-Key for unpublished lessons)
           content:
             application/json:
               schema:
@@ -941,3 +1080,16 @@ paths:
             text/html:
               schema:
                 type: string
+
+  /api/openapi.json:
+    get:
+      summary: OpenAPI Specification JSON
+      description: Returns the raw OpenAPI 3.0 specification document as JSON.
+      operationId: getOpenApiJson
+      responses:
+        '200':
+          description: OpenAPI JSON document
+          content:
+            application/json:
+              schema:
+                type: object

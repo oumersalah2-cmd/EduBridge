@@ -143,6 +143,7 @@ describe('API Contract & Mock Mode Tests (Phase A)', () => {
       expect(res.body).toHaveProperty('id');
       expect(res.body).toHaveProperty('title');
       expect(res.body).toHaveProperty('status');
+      expect(res.body).toHaveProperty('videoUrl');
       expect(res.body).toHaveProperty('audioUrl');
       expect(res.body).toHaveProperty('signVideoUrl');
       expect(res.body).toHaveProperty('transcript');
@@ -158,6 +159,17 @@ describe('API Contract & Mock Mode Tests (Phase A)', () => {
       expect(res.body.captions).toHaveProperty('am');
       expect(res.body.captions.am.reviewStatus).toBe('machine-generated');
       expect(res.body.captions.am.url).toMatch(/\/(assets\/demo|uploads\/captions)\/demo_lesson_am\.vtt$/);
+    });
+
+    it('GET /api/videos/:id/preview returns studio preview with rawCaptions', async () => {
+      const res = await request(app)
+        .get('/api/videos/mock-video-demo-01/preview')
+        .set('X-Studio-Key', TEST_KEY);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('videoUrl');
+      expect(res.body).toHaveProperty('rawCaptions');
+      expect(typeof res.body.rawCaptions.en).toBe('string');
+      expect(res.body.rawCaptions.en).toContain('WEBVTT');
     });
 
     it('GET /api/public/videos/:id/offlinepack downloads zip bundle with audio, transcript, lesson.html, brf', async () => {

@@ -132,6 +132,101 @@ videosRouter.post(
   }
 );
 
+// GET /api/videos/:id/preview - Authenticated Studio preview (X-Studio-Key, all statuses except failed)
+videosRouter.get('/:id/preview', studioKey, async (req, res, next) => {
+  const { id } = req.params;
+
+  if (process.env.MOCK_API === 'true') {
+    const mock = getMockPublicVideo(id, req);
+    return res.json({
+      ...mock,
+      status: 'review',
+      rawCaptions: {
+        en: 'WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome to this accessible lesson on renewable energy.\n\n00:00:04.500 --> 00:00:09.000\nToday we will explore solar photovoltaic cells and how they generate clean electricity.',
+        am: 'WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንኳን ወደዚህ ተደራሽ የታዳሽ ኃይል ትምህርት በደህና መጡ።\n\n00:00:04.500 --> 00:00:09.000\nዛሬ የፀሐይ የፎቶቮልታይክ ሴሎችን እና እንዴት ንጹህ ኤሌክትሪክ እንደሚያመነጩ እንመረምራለን።'
+      }
+    });
+  }
+
+  try {
+    let video = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      video = await Video.findById(id);
+    } else {
+      video = await Video.findOne({ $or: [{ _id: id }, { customId: id }] });
+    }
+
+    if (!video) {
+      return res.status(404).json({
+        error: `Lesson with ID "${id}" was not found.`
+      });
+    }
+
+    if (video.status === 'failed') {
+      return res.status(409).json({
+        error: 'Preview is not available because processing failed for this lesson.'
+      });
+    }
+
+    const captions = {};
+    const rawCaptions = { en: null, am: null };
+
+    ['en', 'am', 'om'].forEach((lang) => {
+      const track = video.captions && video.captions[lang];
+      if (track && (track.vttUrl || track.vttPath || track.url)) {
+        captions[lang] = {
+          url: toAbsoluteUrl(track.vttUrl || track.url || `/uploads/captions/${video._id}_${lang}.vtt`, req),
+          reviewStatus: track.reviewStatus || track.status || 'machine-generated'
+        };
+      }
+
+      // Read raw WebVTT content if present
+      if (track && track.vttPath && fs.existsSync(track.vttPath)) {
+        try {
+          rawCaptions[lang] = fs.readFileSync(track.vttPath, 'utf8');
+        } catch (e) {
+          rawCaptions[lang] = null;
+        }
+      } else if (track && (track.vttUrl || track.url)) {
+        const candidate = path.resolve(__dirname, `../../${(track.vttUrl || track.url).replace(/^\//, '')}`);
+        if (fs.existsSync(candidate)) {
+          try {
+            rawCaptions[lang] = fs.readFileSync(candidate, 'utf8');
+          } catch (e) {}
+        }
+      }
+    });
+
+    let videoUrl = null;
+    const relVideo = video.videoUrl || (video.sourcePath ? `/uploads/videos/${path.basename(video.sourcePath)}` : null);
+    if (relVideo) {
+      videoUrl = toAbsoluteUrl(relVideo, req);
+    }
+
+    res.json({
+      id: video._id.toString(),
+      title: video.title,
+      status: video.status,
+      videoUrl,
+      audioUrl: toAbsoluteUrl(video.audioUrl || video.audioPath || '', req),
+      signVideoUrl: video.signVideoUrl ? toAbsoluteUrl(video.signVideoUrl, req) : null,
+      captions,
+      rawCaptions,
+      transcript: video.transcript || video.transcriptText || '',
+      chatLog: Array.isArray(video.chatLog) ? video.chatLog.map(c => ({
+        id: c.id || c._id?.toString(),
+        type: c.type || 'question',
+        text: c.text,
+        ts: c.ts || (c.createdAt ? c.createdAt.getTime() : Date.now())
+      })) : [],
+      offlinePackUrl: toAbsoluteUrl(video.offlinePackUrl || `/api/public/videos/${video._id}/offlinepack`, req),
+      brailleUrl: video.brailleUrl ? toAbsoluteUrl(video.brailleUrl, req) : null
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/videos/:id - Poll processing progress (for aria-live announcements)
 videosRouter.get('/:id', async (req, res, next) => {
   const { id } = req.params;
@@ -353,7 +448,7 @@ videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
 publicVideosRouter.get('/:id', async (req, res, next) => {
   const { id } = req.params;
 
-  if (process.env.MOCK_API === 'true' || id === 'mock-video-demo-01') {
+  if (process.env.MOCK_API === 'true') {
     return res.json(getMockPublicVideo(id, req));
   }
 
@@ -361,6 +456,8 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
     let video = null;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       video = await Video.findById(id);
+    } else {
+      video = await Video.findOne({ $or: [{ _id: id }, { customId: id }] });
     }
 
     if (!video) {
@@ -369,7 +466,7 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
       });
     }
 
-    if (video.status !== 'published' && video.status !== 'review') {
+    if (video.status !== 'published') {
       return res.status(409).json({
         error: `This lesson is currently "${video.status}" and is not yet available for public access.`
       });
@@ -386,10 +483,17 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
       }
     });
 
+    let videoUrl = null;
+    const relVideo = video.videoUrl || (video.sourcePath ? `/uploads/videos/${path.basename(video.sourcePath)}` : null);
+    if (relVideo) {
+      videoUrl = toAbsoluteUrl(relVideo, req);
+    }
+
     res.json({
       id: video._id.toString(),
       title: video.title,
       status: video.status,
+      videoUrl,
       audioUrl: toAbsoluteUrl(video.audioUrl || video.audioPath || '', req),
       signVideoUrl: video.signVideoUrl ? toAbsoluteUrl(video.signVideoUrl, req) : null,
       captions,
@@ -416,7 +520,7 @@ publicVideosRouter.get('/:id/offlinepack', async (req, res, next) => {
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
 
-  if (process.env.MOCK_API === 'true' || id === 'mock-video-demo-01') {
+  if (process.env.MOCK_API === 'true') {
     const mockDoc = {
       _id: id,
       title: 'Accessible Renewable Energy & Photovoltaics (Demo Lesson)',
@@ -429,6 +533,8 @@ publicVideosRouter.get('/:id/offlinepack', async (req, res, next) => {
     let video = null;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       video = await Video.findById(id);
+    } else {
+      video = await Video.findOne({ $or: [{ _id: id }, { customId: id }] });
     }
 
     if (!video) {

@@ -123,6 +123,7 @@ function getMockPublicVideo(id = 'mock-video-demo-01', req) {
     id,
     title: 'Introduction to Renewable Solar Cells (Demo)',
     status: 'published',
+    videoUrl: `${base}/assets/demo/demo_lesson_sign.mp4`,
     audioUrl: `${base}/assets/demo/demo_lesson_64k.mp3`,
     signVideoUrl: `${base}/assets/demo/demo_lesson_sign.mp4`,
     captions: {

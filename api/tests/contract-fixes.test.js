@@ -28,6 +28,7 @@ describe('Job 1: Contract Fixes, Absolute URLs, CORS, and SSE Tests', () => {
     it('returns absolute URLs in public video metadata', async () => {
       const res = await request(app).get('/api/public/videos/mock-video-demo-01');
       expect(res.status).toBe(200);
+      expect(res.body.videoUrl).toMatch(/^http:\/\/localhost:4000\//);
       expect(res.body.audioUrl).toMatch(/^http:\/\/localhost:4000\//);
       expect(res.body.signVideoUrl).toMatch(/^http:\/\/localhost:4000\//);
       expect(res.body.offlinePackUrl).toMatch(/^http:\/\/localhost:4000\//);
