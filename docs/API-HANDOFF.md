@@ -225,4 +225,16 @@ node api/scripts/checkpoint2-runner.js <path-to-video.mp4>
 ```
 Takes a target video path as a CLI argument, validates the container with `ffprobe`, extracts 16 kHz WAV and 64 kbps mono MP3 with `ffmpeg`, transcribes speech with `faster-whisper`, formats non-overlapping WebVTT cues, and prints status steps and file sizes. If any tool is unavailable, it fails with a plain-language error message.
 
+---
+
+## 9. Changes Log
+
+### 2026-11-14
+- **Demo Assets Relocation**: Tracked demo assets moved from `/uploads/` to `api/assets/demo/` and served at `/assets/demo/` with git tracking exceptions; runtime user uploads remain completely gitignored in `uploads/`.
+- **Contract Parity Verified**: Automated recursive shape tests verified 100% key-and-type parity between mock mode and real mode across all video lifecycle endpoints (`POST /api/videos`, `GET /api/videos/:id`, `PUT /api/videos/:id/captions/:lang`, `POST /api/videos/:id/approve/:lang`, `POST /api/videos/:id/publish`, and `GET /api/public/videos/:id`).
+- **Real 3G Offline Pack**: Full semantic, zero-dependency `lesson.html` (with Ethiopic font fallback and accessible audio player), `audio.mp3`, `transcript.txt`, and optional `lesson.brf` streamed via `GET /api/public/videos/:id/offlinepack`.
+- **409 Conflict Guards**: Real publishing (`POST /api/videos/:id/publish`) enforced only from `review` status; `GET /api/public/videos/:id` guards unpublished lessons.
+- **Production Startup Security**: Server enforces that `STUDIO_KEY` cannot remain the default `"change-me-to-a-long-random-string"` or empty when `NODE_ENV=production`.
+
+
 

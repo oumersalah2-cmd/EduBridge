@@ -19,7 +19,19 @@ function getLocalIp() {
   return 'localhost';
 }
 
+function validateProductionSecurity(env = process.env) {
+  const isProduction = env.NODE_ENV === 'production';
+  const studioKey = env.STUDIO_KEY;
+  const defaultKey = 'change-me-to-a-long-random-string';
+
+  if (isProduction && (!studioKey || studioKey.trim() === '' || studioKey === defaultKey)) {
+    throw new Error('Production security requirement failed: STUDIO_KEY must be set to a secure custom secret in production mode. Refusing to start with missing or default credentials.');
+  }
+}
+
 async function startServer() {
+  validateProductionSecurity();
+
   if (process.env.MOCK_API === 'true') {
     console.log('⚡ EduBridge Mock API active (MOCK_API=true). Fast standalone mode enabled.');
   } else {
@@ -49,4 +61,4 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { startServer };
+module.exports = { startServer, validateProductionSecurity };
