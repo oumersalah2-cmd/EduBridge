@@ -7,6 +7,7 @@ const archiver = require('archiver');
 const studioKey = require('../middleware/studioKey');
 const Video = require('../models/Video');
 const { getPublicBaseUrl, toAbsoluteUrl } = require('../services/urlHelper');
+const { packLessonZip } = require('../services/offlinePackService');
 const {
   getMockPublicVideo,
   getMockVideoProgress,
@@ -312,10 +313,23 @@ videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
       });
     }
 
+    if (video.status !== 'review') {
+      return res.status(409).json({
+        error: `Lesson video cannot be published from status "${video.status}". Only lessons in "review" status can be published.`
+      });
+    }
+
+    // Build 3G offline package
+    const zipFilename = `edubridge-lesson-${video._id}-offline.zip`;
+    const zipPath = path.join(PACKS_DIR, zipFilename);
+    const writeStream = fs.createWriteStream(zipPath);
+    await packLessonZip(video, writeStream);
+
     video.status = 'published';
     video.step = 'Lesson published and ready for accessible distribution.';
     video.embedSnippet = embedScript;
     video.iframeSnippet = embedIframe;
+    video.offlinePackPath = zipPath;
     video.offlinePackUrl = offlinePackUrl;
 
     await video.save();
@@ -355,27 +369,39 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
       });
     }
 
+    if (video.status !== 'published' && video.status !== 'review') {
+      return res.status(409).json({
+        error: `This lesson is currently "${video.status}" and is not yet available for public access.`
+      });
+    }
+
+    const captions = {};
+    ['en', 'am', 'om'].forEach((lang) => {
+      const track = video.captions && video.captions[lang];
+      if (track && (track.vttUrl || track.vttPath || track.url)) {
+        captions[lang] = {
+          url: toAbsoluteUrl(track.vttUrl || track.url || `/uploads/captions/${video._id}_${lang}.vtt`, req),
+          reviewStatus: track.reviewStatus || track.status || 'machine-generated'
+        };
+      }
+    });
+
     res.json({
       id: video._id.toString(),
       title: video.title,
       status: video.status,
-      audioUrl: toAbsoluteUrl(video.audioUrl, req),
+      audioUrl: toAbsoluteUrl(video.audioUrl || video.audioPath || '', req),
       signVideoUrl: video.signVideoUrl ? toAbsoluteUrl(video.signVideoUrl, req) : null,
-      captions: {
-        en: video.captions?.en?.vttUrl
-          ? { url: toAbsoluteUrl(video.captions.en.vttUrl, req), reviewStatus: video.captions.en.status }
-          : undefined,
-        am: video.captions?.am?.vttUrl
-          ? { url: toAbsoluteUrl(video.captions.am.vttUrl, req), reviewStatus: video.captions.am.status }
-          : undefined,
-        om: video.captions?.om?.vttUrl
-          ? { url: toAbsoluteUrl(video.captions.om.vttUrl, req), reviewStatus: video.captions.om.status }
-          : undefined
-      },
+      captions,
       transcript: video.transcript || video.transcriptText || '',
-      chatLog: video.chatLog || [],
+      chatLog: Array.isArray(video.chatLog) ? video.chatLog.map(c => ({
+        id: c.id || c._id?.toString(),
+        type: c.type || 'question',
+        text: c.text,
+        ts: c.ts || (c.createdAt ? c.createdAt.getTime() : Date.now())
+      })) : [],
       offlinePackUrl: toAbsoluteUrl(video.offlinePackUrl || `/api/public/videos/${video._id}/offlinepack`, req),
-      brailleUrl: video.brailleUrl ? toAbsoluteUrl(video.brailleUrl, req) : `${getPublicBaseUrl(req)}/uploads/braille/demo_lesson.brf`
+      brailleUrl: video.brailleUrl ? toAbsoluteUrl(video.brailleUrl, req) : null
     });
   } catch (err) {
     next(err);
@@ -383,37 +409,53 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
 });
 
 // GET /api/public/videos/:id/offlinepack - Download 3G offline zip package
-publicVideosRouter.get('/:id/offlinepack', (req, res, next) => {
+publicVideosRouter.get('/:id/offlinepack', async (req, res, next) => {
   const { id } = req.params;
   const zipName = `edubridge-lesson-${id}-offline.zip`;
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
 
-  const archive = archiver('zip', { zlib: { level: 9 } });
-
-  archive.on('error', (err) => next(err));
-  archive.pipe(res);
-
-  archive.append('EduBridge Audio-First Offline Lesson\nTranscript:\nWelcome to this accessible lesson on renewable energy.\n', {
-    name: 'transcript.txt'
-  });
-  archive.append(
-    '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Offline Lesson</title></head><body><h1>EduBridge Offline Lesson</h1><p>Accessible offline content.</p></body></html>',
-    { name: 'lesson.html' }
-  );
-  archive.append(',edubridge accessible lesson\n,renewable energy\n', {
-    name: 'lesson.brf'
-  });
-
-  const sampleMp3Path = path.join(AUDIO_DIR, 'demo_lesson_64k.mp3');
-  if (fs.existsSync(sampleMp3Path)) {
-    archive.file(sampleMp3Path, { name: 'audio.mp3' });
-  } else {
-    archive.append(Buffer.from([]), { name: 'audio.mp3' });
+  if (process.env.MOCK_API === 'true' || id === 'mock-video-demo-01') {
+    const mockDoc = {
+      _id: id,
+      title: 'Accessible Renewable Energy & Photovoltaics (Demo Lesson)',
+      transcript: 'Welcome to this accessible lesson on renewable energy. Today we will explore solar photovoltaic cells and how they generate clean electricity. Notice how sunlight frees electrons in the semiconductor material.'
+    };
+    return packLessonZip(mockDoc, res).catch((err) => next(err));
   }
 
-  archive.finalize();
+  try {
+    let video = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      video = await Video.findById(id);
+    }
+
+    if (!video) {
+      res.status(404).setHeader('Content-Type', 'application/json');
+      return res.json({
+        error: `Lesson video with ID "${id}" was not found.`
+      });
+    }
+
+    if (video.status !== 'published' && video.status !== 'review') {
+      res.status(409).setHeader('Content-Type', 'application/json');
+      return res.json({
+        error: `Lesson video with ID "${id}" is not published.`
+      });
+    }
+
+    // If pre-built zip exists, stream it directly
+    const cachedPack = video.offlinePackPath || path.join(PACKS_DIR, zipName);
+    if (fs.existsSync(cachedPack) && fs.statSync(cachedPack).size > 0) {
+      return fs.createReadStream(cachedPack).pipe(res);
+    }
+
+    // Build and stream zip
+    await packLessonZip(video, res);
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = {
