@@ -68,6 +68,9 @@ if (openApiPath) {
   try {
     const swaggerDocument = YAML.load(openApiPath);
     app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    app.get('/api/openapi.json', (req, res) => {
+      res.json(swaggerDocument);
+    });
   } catch (err) {
     console.error('Failed to load OpenAPI spec from:', openApiPath, err.message);
   }
