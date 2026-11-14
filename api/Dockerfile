@@ -26,6 +26,9 @@ WORKDIR /app
 ENV HF_HOME=/root/.cache/huggingface
 RUN mkdir -p /root/.cache/huggingface /app/uploads
 
+# Pre-download / bake faster-whisper base model into image for offline readiness
+RUN python3 -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
+
 # Install Node.js dependencies
 COPY package*.json ./
 RUN npm ci --omit=dev || npm install --omit=dev
