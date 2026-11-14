@@ -1,46 +1,47 @@
-import React from 'react';
+import { useState } from 'react';
+import UploadStep from './UploadStep.jsx';
+import CaptionsStep from './CaptionsStep.jsx';
+import PublishStep from './PublishStep.jsx';
 
 export default function App() {
+  const [lesson, setLesson] = useState(null);
+  const [message, setMessage] = useState('');
+
+  // One place that speaks to screen readers and shows the same text on screen.
+  const announce = (text) => {
+    setMessage('');
+    setTimeout(() => setMessage(text), 50);
+  };
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <a href="#main-content" className="skip-link">
+    <div className="min-h-screen bg-white text-slate-900">
+      <a
+        href="#main"
+        className="absolute left-2 top-2 -translate-y-20 bg-blue-800 px-4 py-3 text-white focus:translate-y-0"
+      >
         Skip to main content
       </a>
 
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="text-xl font-bold tracking-tight text-blue-900">
-            EduBridge Studio
-          </div>
-          <nav aria-label="Main Navigation">
-            <ul className="flex space-x-4 text-sm font-medium text-gray-700">
-              <li>
-                <a
-                  href="#main-content"
-                  className="px-3 py-1 rounded hover:bg-gray-100 transition-colors"
-                >
-                  Dashboard
-                </a>
-              </li>
-            </ul>
-          </nav>
-        </div>
+      <header className="mx-auto max-w-3xl px-4 pt-6">
+        <h1 className="text-3xl font-bold">EduBridge Studio</h1>
+        <p className="mt-2 text-lg text-slate-700">
+          Upload a lesson, check its captions, then copy one line of code to put it on any website.
+        </p>
       </header>
 
-      <main id="main-content" tabIndex="-1" className="flex-1 max-w-6xl w-full mx-auto px-6 py-12 outline-none">
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-4">
-          EduBridge Teacher Studio
-        </h1>
-        <p className="text-lg text-gray-700 leading-relaxed max-w-2xl">
-          Welcome to the EduBridge accessible authoring and classroom orchestrator.
-          This studio allows educators to record, transcribe, translate, and publish
-          learning resources accessible across low-bandwidth 3G, audio, sign language, and Braille.
+      <main id="main" className="mx-auto max-w-3xl space-y-8 px-4 py-6">
+        <p
+          role="status"
+          aria-live="polite"
+          className="min-h-12 rounded border-2 border-slate-500 bg-slate-100 px-4 py-3 text-lg"
+        >
+          {message}
         </p>
-      </main>
 
-      <footer className="border-t border-gray-200 bg-white px-6 py-6 text-center text-sm text-gray-600">
-        EduBridge &mdash; Accessible Learning Media Platform (Digital Bridge Hackathon 2026)
-      </footer>
+        <UploadStep onReady={setLesson} announce={announce} />
+        <CaptionsStep lesson={lesson} onChange={setLesson} announce={announce} />
+        <PublishStep lesson={lesson} onChange={setLesson} announce={announce} />
+      </main>
     </div>
   );
 }

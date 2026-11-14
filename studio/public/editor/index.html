@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Caption editor</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <a class="skip" href="#lines-heading" data-i18n="skip">Skip to caption lines</a>
+
+  <header class="page-header">
+    <h1 data-i18n="title">Caption editor</h1>
+    <div class="field">
+      <label for="ui-lang" data-i18n="uiLang">Interface language</label>
+      <select id="ui-lang">
+        <option value="en" lang="en">English</option>
+        <option value="am" lang="am">አማርኛ</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <section aria-labelledby="files-heading" class="panel">
+      <h2 id="files-heading" data-i18n="filesHeading">Files</h2>
+      <div class="field">
+        <label for="vtt-input" data-i18n="openVtt">Open caption file (.vtt)</label>
+        <input type="file" id="vtt-input" accept=".vtt,text/vtt">
+      </div>
+      <div class="row">
+        <button type="button" class="btn" id="sample-btn" data-i18n="loadSample">Load sample captions</button>
+        <button type="button" class="btn" id="restore-btn" data-i18n="restore" disabled>Restore saved draft</button>
+      </div>
+      <div class="field">
+        <label for="video-input" data-i18n="openVideo">Open video to preview (optional)</label>
+        <input type="file" id="video-input" accept="video/*">
+      </div>
+      <div class="field">
+        <label for="cap-lang" data-i18n="capLang">Caption language</label>
+        <select id="cap-lang">
+          <option value="en" lang="en">English</option>
+          <option value="am" lang="am">አማርኛ</option>
+        </select>
+      </div>
+    </section>
+
+    <video id="preview" controls preload="metadata" hidden></video>
+
+    <p id="error" role="alert" class="error"></p>
+    <p id="status" role="status" aria-live="polite" class="status"></p>
+
+    <section aria-labelledby="lines-heading">
+      <h2 id="lines-heading" tabindex="-1" data-i18n="linesHeading">Caption lines</h2>
+      <p id="summary" class="muted"></p>
+      <div class="row sticky-free">
+        <button type="button" class="btn" id="save-btn" data-i18n="save">Save now</button>
+        <button type="button" class="btn primary" id="export-btn" data-i18n="exportVtt">Export .vtt</button>
+        <button type="button" class="btn" id="help-btn" data-i18n="help">Keyboard help</button>
+      </div>
+      <ol id="lines" class="lines"></ol>
+    </section>
+  </main>
+
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <h2 id="help-title" data-i18n="helpTitle">Keyboard shortcuts</h2>
+    <dl class="keys">
+      <dt><kbd>Alt</kbd> + <kbd>Down</kbd></dt><dd data-i18n="kNext">Go to the next line</dd>
+      <dt><kbd>Alt</kbd> + <kbd>Up</kbd></dt><dd data-i18n="kPrev">Go to the previous line</dd>
+      <dt><kbd>Alt</kbd> + <kbd>R</kbd></dt><dd data-i18n="kReplay">Replay the current line in the video</dd>
+      <dt><kbd>Alt</kbd> + <kbd>F</kbd></dt><dd data-i18n="kFlag">Mark or unmark the current line as needing review</dd>
+      <dt><kbd>Ctrl</kbd> + <kbd>S</kbd></dt><dd data-i18n="kSave">Save</dd>
+    </dl>
+    <p data-i18n="helpNote">Every shortcut also has a button on the page.</p>
+    <button type="button" class="btn primary" id="help-close" data-i18n="close">Close</button>
+  </dialog>
+
+  <script src="vtt.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>
