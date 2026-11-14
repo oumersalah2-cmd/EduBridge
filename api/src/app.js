@@ -117,7 +117,13 @@ app.use((req, res) => {
 
 // Plain-language error handler (accessible, no stack traces or jargon)
 app.use((err, req, res, next) => {
-  const status = err.status || (err.name === 'MulterError' ? 400 : 500);
+  let status = err.status || 500;
+  if (err.name === 'MulterError') {
+    status = (err.code === 'LIMIT_FILE_SIZE') ? 413 : 400;
+  } else if (err.message && err.message.toLowerCase().includes('unsupported video format')) {
+    status = 400;
+  }
+
   let message = err.message || 'An unexpected error occurred. Please try again.';
 
   if (err.code === 'LIMIT_FILE_SIZE') {

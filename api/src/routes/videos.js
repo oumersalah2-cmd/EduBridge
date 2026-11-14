@@ -56,7 +56,9 @@ const upload = multer({
     const allowed = ['.mp4', '.webm', '.mov'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (!allowed.includes(ext)) {
-      return cb(new Error(`Unsupported video format "${ext}". Please upload an MP4, WebM, or MOV video file.`));
+      const err = new Error(`Unsupported video format "${ext}". Please upload an MP4, WebM, or MOV video file.`);
+      err.status = 400;
+      return cb(err);
     }
     cb(null, true);
   }

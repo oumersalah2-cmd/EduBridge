@@ -8,6 +8,11 @@ const CaptionTrackSchema = new mongoose.Schema({
     enum: ['machine-generated', 'human-reviewed'],
     default: 'machine-generated'
   },
+  reviewStatus: {
+    type: String,
+    enum: ['machine-generated', 'human-reviewed'],
+    default: 'machine-generated'
+  },
   approvedAt: { type: Date }
 }, { _id: false });
 
@@ -20,23 +25,31 @@ const VideoSchema = new mongoose.Schema({
     required: true
   },
   progress: { type: Number, default: 0, min: 0, max: 100 },
-  step: { type: String, default: 'Video uploaded, awaiting processing' },
-  error: { type: String },
+  step: { type: String, default: 'Video uploaded. Queued for audio extraction and transcription.' },
+  error: { type: String, default: null },
 
+  // Source and media file paths
+  sourcePath: { type: String },
+  signPath: { type: String },
   videoPath: { type: String },
   videoUrl: { type: String },
   signVideoPath: { type: String },
   signVideoUrl: { type: String },
+  wavPath: { type: String },
+  mp3Path: { type: String },
   audioPath: { type: String },
   audioUrl: { type: String },
 
+  // Captions & Transcripts
   captions: {
     en: { type: CaptionTrackSchema, default: () => ({}) },
     am: { type: CaptionTrackSchema, default: () => ({}) },
     om: { type: CaptionTrackSchema, default: () => ({}) }
   },
-
+  transcript: { type: String, default: '' },
   transcriptText: { type: String, default: '' },
+  transcriptPath: { type: String },
+
   chatLog: [{
     id: { type: String },
     type: { type: String, enum: ['question', 'board', 'system'], default: 'question' },
