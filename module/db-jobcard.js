@@ -19,9 +19,11 @@ class DbJobCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this.currentLang = this.getAttribute('lang') || 'am';
+    const rawLang = this.getAttribute('lang');
+    this.currentLang = ['en', 'am', 'om', 'ti'].includes(rawLang) ? rawLang : 'en';
     this.isSpeaking = false;
     this.speechSynth = window.speechSynthesis || null;
+    this.i18n = {};
 
     // Default sample job data (Ethiopian tech opportunities)
     this.jobsData = {
@@ -29,14 +31,22 @@ class DbJobCard extends HTMLElement {
         id: "job-et-01",
         title: "Junior Front-End Developer (Accessibility Focus)",
         titleAm: "ጀማሪ የፊት-ለፊት ሶፍትዌር አበልጻጊ (ተደራሽነት)",
+        titleOm: "Misoomsaa Fuulduraa Sadarkaa Jalqabaa (Xiyyeeffannoo Qaqqabamummaa)",
+        titleTi: "ጀማሪ ናይ ቅድሚት ሶፍትዌር ኣማዕባሊ (ተበጻሕነት ዘተኮረ)",
         employer: "Gebeya Inc.",
         location: "Addis Ababa, Ethiopia (Hybrid)",
         locationAm: "አዲስ አበባ፣ ኢትዮጵያ (ድቅል)",
+        locationOm: "Finfinnee, Itoophiyaa (Wal-makaa)",
+        locationTi: "ኣዲስ ኣበባ፣ ኢትዮጵያ (ድቓል)",
         employmentType: "Full-Time",
         deadline: "2026-12-15",
         deadlineAm: "ታህሳስ 6፣ 2019 ዓ.ም",
+        deadlineOm: "Muddee 6, 2019",
+        deadlineTi: "ታሕሳስ 6፣ 2019",
         audioSummary: "Gebeya is hiring a Junior Front-End Developer with focus on web accessibility. Responsibilities include building accessible UI and keyboard navigation. Accommodations provided for disabled candidates including sign language interpreters.",
         audioSummaryAm: "ገበያ ኢንክ የድር ተደራሽነት ፍላጎት ያለው ጀማሪ የፊት-ለፊት ሶፍትዌር አበልጻጊ እየቀጠረ ነው። መስፈርቶች ኤችቲኤምኤል፣ ሲኤስኤስ፣ ጃቫስክሪፕት እና የተደራሽነት ግንዛቤን ያካትታሉ። ለአካል ጉዳተኛ አመልካቾች የምልክት ቋንቋ ተርጓሚን ጨምሮ ሙሉ ድጋፍ ይሰጣል።",
+        audioSummaryOm: "Dhaabbanni Gebeya Inc misoomsaa fuulduraa xiyyeeffannoo qaqqabamummaa qabu qacaruu barbaada. Itti-gaafatamummaan UI qaqqabamaa fi naannoo kiiboordii ijaaruu dabalata. Iyyattoota qaama miidhamtootaaf deeggarsi turjumaana afaan mallattoo ni kennama.",
+        audioSummaryTi: "ገበያ ኢንክ ናይ ወብ ተበጻሕነት ድሌት ዘለዎ ጀማሪ ናይ ቅድሚት ሶፍትዌር ኣማዕባሊ ይቖጽር ኣሎ። ሓላፍነት ተበጻሒ UIን ናይ ሰሌዳ ዳህሳስን ምስራሕ የጠቓልል። ንስንኩላን ሕጹያት ናይ ቋንቋ ምልክት ኣስተርጎምቲ ሓዊሱ ምሉእ ደገፍ ይወሃብ።",
         description: "Develop inclusive user interfaces complying with WCAG 2.2 AA standards for regional learners.",
         requirements: [
           "Understanding of semantic HTML5 and modern CSS",
@@ -48,8 +58,20 @@ class DbJobCard extends HTMLElement {
           "የተደራሽነት መመሪያዎችን (WCAG 2.2 AA) ማወቅ",
           "የስክሪን አንባቢዎችን (NVDA ወይም TalkBack) የመጠቀም ልምድ"
         ],
+        requirementsOm: [
+          "Hubannoo bu'uuraa HTML5 fi modern CSS",
+          "Qajeelfamoota qaqqabamummaa (WCAG 2.2 AA) beekuu",
+          "Muuxannoo dubbiftuu iskiriinii (NVDA ykn TalkBack) fayyadamuu"
+        ],
+        requirementsTi: [
+          "ናይ HTML5ን ዘመናዊ CSSን መሰረታዊ ርድኢት",
+          "ናይ ተበጻሕነት መምርሒታት (WCAG 2.2 AA) ምፍላጥ",
+          "ናይ ስክሪን ኣንበብቲ (NVDA ወይ TalkBack) ናይ ምጥቃም ተሞክሮ"
+        ],
         accommodations: "Sign language interpreter for interviews; accessible workstations; flexible remote hours.",
         accommodationsAm: "ለቃለ-መጠይቅ የምልክት ቋንቋ ተርጓሚ፤ ተደራሽ የሥራ ቦታዎች፤ ተለዋዋጭ የርቀት የሥራ ሰዓት።",
+        accommodationsOm: "Qorumsa afaaniif turjumaana afaan mallattoo; bakka hojii qaqqabamaa; sa'aatii hojii fageenyaa jijjiiramaa.",
+        accommodationsTi: "ንቃለ-መሕትት ናይ ቋንቋ ምልክት ኣስተርጓሚ፤ ተበጻሒ ናይ ስራሕ ቦታታት፤ ምቹእ ናይ ርሑቕ ስራሕ ሰዓታት።",
         certificateUrl: "/api/v1/certificates/cert-demo-01/verify",
         applyUrl: "https://careers.gebeya.com/apply/a11y-dev",
         schema: {
@@ -79,9 +101,73 @@ class DbJobCard extends HTMLElement {
   }
 
   connectedCallback() {
+    this.loadTranslations();
     this.render();
     this.injectSchemaOrgJsonLd();
     this.loadJobData();
+  }
+
+  async loadTranslations() {
+    const TRANSLATIONS = {
+      en: {
+        audioBtn: "Listen to Summary",
+        audioStop: "Stop Audio",
+        audioTitle: "Spoken Audio Summary",
+        reqTitle: "Key Requirements",
+        accTitle: "Accommodations Provided",
+        deadlineTitle: "Deadline:",
+        certBtn: "Verify EduBridge Certificate",
+        applyBtn: "Apply Now"
+      },
+      am: {
+        audioBtn: "በድምጽ አጠቃልለህ አንብብ",
+        audioStop: "ማንበብ አቁም",
+        audioTitle: "የሥራው አጭር ማጠቃለያ (በድምጽ)",
+        reqTitle: "ዋና ዋና መስፈርቶች",
+        accTitle: "የአካል ጉዳተኞች የስራ ማመቻቻ (Accommodations)",
+        deadlineTitle: "የማመልከቻ ማብቂያ፦",
+        certBtn: "የተረጋገጠ የኤዱብሪጅ ሰርተፍኬት አሳይ",
+        applyBtn: "አሁን አመልክት"
+      },
+      om: {
+        audioBtn: "Dhaggeeffadhu (Gabaasa)",
+        audioStop: "Sagalee Dhaabi",
+        audioTitle: "Gabaasa Sagalee",
+        reqTitle: "Ulaagaalee Ijoo",
+        accTitle: "Haalawwan Mijaawaa Qaama Miidhamtootaa",
+        deadlineTitle: "Guyyaa Dhumaa:",
+        certBtn: "Waraqaa Ragaa EduBridge Mirkaneessi",
+        applyBtn: "Amma Iyyadhu"
+      },
+      ti: {
+        audioBtn: "ስማዕ (ሓጺር ጸብጻብ)",
+        audioStop: "ድምጺ ኣቋርጽ",
+        audioTitle: "ናይ ድምጺ ሓጺር ጸብጻብ",
+        reqTitle: "ቀንዲ መዐቀኒታት",
+        accTitle: "ምቹእ ኩነታት ንስንኩላን",
+        deadlineTitle: "ናይ መወዳእታ ዕለት:",
+        certBtn: "ዝተረጋገጸ ምስክር ወረቐት ኤዱብሪጅ ርአ",
+        applyBtn: "ሕጂ ኣመልክት"
+      }
+    };
+
+    try {
+      const candidates = [`./i18n/${this.currentLang}.json`, `/jobcard/i18n/${this.currentLang}.json`];
+      for (const p of candidates) {
+        try {
+          const res = await fetch(p);
+          if (res.ok) {
+            const data = await res.json();
+            this.i18n = Object.assign({}, TRANSLATIONS[this.currentLang] || TRANSLATIONS.en, data);
+            this.render();
+            return;
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    this.i18n = TRANSLATIONS[this.currentLang] || TRANSLATIONS.en;
+    this.render();
   }
 
   async loadJobData() {
@@ -106,7 +192,8 @@ class DbJobCard extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     if (oldValue !== newValue && this.shadowRoot.innerHTML) {
       if (name === 'lang') {
-        this.currentLang = newValue || 'am';
+        this.currentLang = ['en', 'am', 'om', 'ti'].includes(newValue) ? newValue : 'en';
+        this.loadTranslations();
       } else if (name === 'src') {
         this.loadJobData();
       }
@@ -134,23 +221,32 @@ class DbJobCard extends HTMLElement {
   render() {
     const jobId = this.getAttribute('job-id') || 'job-et-01';
     const job = this.jobsData[jobId] || this.jobsData['job-et-01'];
-    const isAm = this.currentLang === 'am';
+    const lang = this.currentLang;
+    const isEthiopic = lang === 'am' || lang === 'ti';
 
+    const getField = (prefix) => {
+      if (lang === 'am') return job[prefix + 'Am'] || job[prefix];
+      if (lang === 'om') return job[prefix + 'Om'] || job[prefix];
+      if (lang === 'ti') return job[prefix + 'Ti'] || job[prefix];
+      return job[prefix];
+    };
+
+    const i18n = this.i18n || {};
     const t = {
-      title: isAm ? job.titleAm : job.title,
-      location: isAm ? job.locationAm : job.location,
-      audioBtn: isAm ? "በድምጽ አጠቃልለህ አንብብ" : "Listen to Summary",
-      audioStop: isAm ? "ማንበብ አቁም" : "Stop Audio",
-      audioTitle: isAm ? "የሥራው አጭር ማጠቃለያ (በድምጽ)" : "Spoken Audio Summary",
-      summaryText: isAm ? job.audioSummaryAm : job.audioSummary,
-      reqTitle: isAm ? "ዋና ዋና መስፈርቶች" : "Key Requirements",
-      reqList: isAm ? job.requirementsAm : job.requirements,
-      accTitle: isAm ? "የአካል ጉዳተኞች የስራ ማመቻቻ (Accommodations)" : "Accommodations Provided",
-      accText: isAm ? job.accommodationsAm : job.accommodations,
-      deadlineTitle: isAm ? "የማመልከቻ ማብቂያ፦" : "Deadline:",
-      deadline: isAm ? job.deadlineAm : job.deadline,
-      certBtn: isAm ? "የተረጋገጠ የኤዱብሪጅ ሰርተፍኬት አሳይ" : "Verify EduBridge Certificate",
-      applyBtn: isAm ? "አሁን አመልክት" : "Apply Now"
+      title: getField('title'),
+      location: getField('location'),
+      audioBtn: i18n.audioBtn || (lang === 'am' ? "በድምጽ አጠቃልለህ አንብብ" : lang === 'om' ? "Dhaggeeffadhu (Gabaasa)" : lang === 'ti' ? "ስማዕ (ሓጺር ጸብጻብ)" : "Listen to Summary"),
+      audioStop: i18n.audioStop || (lang === 'am' ? "ማንበብ አቁም" : lang === 'om' ? "Sagalee Dhaabi" : lang === 'ti' ? "ድምጺ ኣቋርጽ" : "Stop Audio"),
+      audioTitle: i18n.audioTitle || (lang === 'am' ? "የሥራው አጭር ማጠቃለያ (በድምጽ)" : lang === 'om' ? "Gabaasa Sagalee" : lang === 'ti' ? "ናይ ድምጺ ሓጺር ጸብጻብ" : "Spoken Audio Summary"),
+      summaryText: getField('audioSummary'),
+      reqTitle: i18n.reqTitle || (lang === 'am' ? "ዋና ዋና መስፈርቶች" : lang === 'om' ? "Ulaagaalee Ijoo" : lang === 'ti' ? "ቀንዲ መዐቀኒታት" : "Key Requirements"),
+      reqList: getField('requirements'),
+      accTitle: i18n.accTitle || (lang === 'am' ? "የአካል ጉዳተኞች የስራ ማመቻቻ (Accommodations)" : lang === 'om' ? "Haalawwan Mijaawaa Qaama Miidhamtootaa" : lang === 'ti' ? "ምቹእ ኩነታት ንስንኩላን" : "Accommodations Provided"),
+      accText: getField('accommodations'),
+      deadlineTitle: i18n.deadlineTitle || (lang === 'am' ? "የማመልከቻ ማብቂያ፦" : lang === 'om' ? "Guyyaa Dhumaa:" : lang === 'ti' ? "ናይ መወዳእታ ዕለት:" : "Deadline:"),
+      deadline: getField('deadline'),
+      certBtn: i18n.certBtn || (lang === 'am' ? "የተረጋገጠ የኤዱብሪጅ ሰርተፍኬት አሳይ" : lang === 'om' ? "Waraqaa Ragaa EduBridge Mirkaneessi" : lang === 'ti' ? "ዝተረጋገጸ ምስክር ወረቐት ኤዱብሪጅ ርአ" : "Verify EduBridge Certificate"),
+      applyBtn: i18n.applyBtn || (lang === 'am' ? "አሁን አመልክት" : lang === 'om' ? "Amma Iyyadhu" : lang === 'ti' ? "ሕጂ ኣመልክት" : "Apply Now")
     };
 
     this.shadowRoot.innerHTML = `
@@ -160,7 +256,7 @@ class DbJobCard extends HTMLElement {
           max-width: 100%;
           font-family: var(--bs-body-font-family, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
           color: var(--bs-body-color, #0f172a);
-          line-height: ${isAm ? '1.7' : '1.5'};
+          line-height: ${isEthiopic ? '1.7' : '1.5'};
         }
 
         .job-card {
@@ -468,10 +564,10 @@ class DbJobCard extends HTMLElement {
       </article>
     `;
 
-    this.setupEventListeners(job, isAm, t);
+    this.setupEventListeners(job, lang, t);
   }
 
-  setupEventListeners(job, isAm, t) {
+  setupEventListeners(job, lang, t) {
     const listenBtn = this.shadowRoot.querySelector('#btn-audio-listen');
     const listenIcon = this.shadowRoot.querySelector('#listen-icon');
     const listenText = this.shadowRoot.querySelector('#listen-text');
@@ -483,7 +579,7 @@ class DbJobCard extends HTMLElement {
       listenBtn.classList.remove('speaking');
       listenIcon.textContent = '▶';
       listenText.textContent = t.audioBtn;
-      srAlert.textContent = isAm ? "የድምጽ ንባብ ቆሟል" : "Audio summary stopped.";
+      srAlert.textContent = lang === 'am' ? "የድምጽ ንባብ ቆሟል" : lang === 'om' ? "Sagaleen dhaabbateera." : lang === 'ti' ? "ድምጺ ኣቋሪጹ" : "Audio summary stopped.";
     };
 
     const startAudio = () => {
@@ -493,9 +589,12 @@ class DbJobCard extends HTMLElement {
       }
 
       this.speechSynth.cancel();
-      const textToSpeak = `${job.employer} - ${isAm ? job.titleAm : job.title}. ${isAm ? job.audioSummaryAm : job.audioSummary}. ${isAm ? job.accommodationsAm : job.accommodations}`;
+      const textToSpeak = `${job.employer} - ${t.title}. ${t.summaryText}. ${t.accText}`;
       const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      utterance.lang = isAm ? 'am-ET' : 'en-US';
+      if (lang === 'am') utterance.lang = 'am-ET';
+      else if (lang === 'ti') utterance.lang = 'ti-ET';
+      else if (lang === 'om') utterance.lang = 'om-ET';
+      else utterance.lang = 'en-US';
       utterance.rate = 1.0;
 
       utterance.onend = () => stopAudio();
@@ -505,7 +604,7 @@ class DbJobCard extends HTMLElement {
       listenBtn.classList.add('speaking');
       listenIcon.textContent = '⏹';
       listenText.textContent = t.audioStop;
-      srAlert.textContent = isAm ? "የድምጽ ንባብ በመጫወት ላይ" : "Playing audio summary.";
+      srAlert.textContent = lang === 'am' ? "የድምጽ ንባብ በመጫወት ላይ" : lang === 'om' ? "Gabaasni sagalee taphachaa jira." : lang === 'ti' ? "ድምጺ ይስማዕ ኣሎ" : "Playing audio summary.";
       this.speechSynth.speak(utterance);
     };
 

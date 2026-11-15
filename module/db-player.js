@@ -30,18 +30,21 @@ class DbPlayer extends HTMLElement {
 
     this.isPlaying = false;
     this.isMuted = false;
-    this.currentLang = this.getAttribute('lang') || 'am';
+    const rawLang = this.getAttribute('lang');
+    this.currentLang = ['en', 'am', 'om', 'ti'].includes(rawLang) ? rawLang : 'en';
     this.i18n = {};
 
     // Captions state
     this.captionsVisible = true;
-    this.captionLang = this.currentLang; // 'am' or 'en'
+    this.captionLang = this.currentLang; // 'en', 'am', 'om', 'ti'
     this.captionSize = localStorage.getItem('edubridge_caption_size') || '125'; // 100, 125, 150, 200%
     this.captionTheme = localStorage.getItem('edubridge_caption_theme') || 'yellow-black'; // 'white-black', 'yellow-black', 'black-yellow'
     this.isAmharicReviewed = true; // Toggle for Human-reviewed vs Machine-generated badge
     this.captionTracks = {
       en: [],
-      am: []
+      am: [],
+      om: [],
+      ti: []
     };
 
     // Ethiopian Sign Language (EthSL) state
@@ -70,7 +73,7 @@ class DbPlayer extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     if (oldValue !== newValue && this.shadowRoot.innerHTML) {
       if (name === 'lang') {
-        this.currentLang = newValue || 'am';
+        this.currentLang = ['en', 'am', 'om', 'ti'].includes(newValue) ? newValue : 'en';
         this.captionLang = this.currentLang;
         this.loadTranslations();
       } else if (name === 'captions') {
@@ -110,7 +113,12 @@ class DbPlayer extends HTMLElement {
         if (data.captionUrls && data.captionUrls.length > 0) {
           this.setAttribute('captions', data.captionUrls.join(','));
         } else if (data.captions) {
-          const urls = [data.captions.en?.url, data.captions.am?.url].filter(Boolean);
+          const urls = [
+            data.captions.en?.url,
+            data.captions.am?.url,
+            data.captions.om?.url,
+            data.captions.ti?.url
+          ].filter(Boolean);
           if (urls.length > 0) {
             this.setAttribute('captions', urls.join(','));
           }
@@ -152,6 +160,24 @@ class DbPlayer extends HTMLElement {
       { start: 15.5, end: 21.0, text: "የኢትዮጵያ የምልክት ቋንቋ ተርጓሚዎችን ጨምሮ በእንግሊዝኛ እና በአማርኛ የተመሳሰሉ የትርጉም ጽሑፎችን እናቀርባለን።" },
       { start: 21.5, end: 27.0, text: "በ 2G እና 3G ግንኙነቶች ላይ ላሉ ተማሪዎች፣ አነስተኛ ከመስመር ውጭ ጥቅሎች በአገሪቱ ውስጥ በየትኛውም ቦታ ከመስመር ውጭ እንዲያጠኑ ያስችላቸዋል።" },
       { start: 27.5, end: 32.0, text: "[ሙዚቃ ያበቃል] ወደ ተደራሽ እና ፍትሃዊ ትምህርት ጉዟችንን እንጀምር።" }
+    ];
+
+    this.captionTracks.om = [
+      { start: 0.0, end: 4.0, text: "Baga gara EduBridge nagaan dhuftan: Barnoota Tokko, Toora-irra fi Qaamaan, Dandeettii Hundaaf." },
+      { start: 4.5, end: 9.0, text: "Barnoota kana keessatti, injinarummaa sooftiweerii qaqqabamaa fi dizaayinii hunda-hammattoo Itoophiyaa ni qoranna." },
+      { start: 9.5, end: 15.0, text: "Qaqqabamummaa jechuun barattoonni gurri duudaa, qaro-dhabeeyyii ykn argaan isaanii daangeffame gufuu tokko malee baruu danda'uu isaaniiti." },
+      { start: 15.5, end: 21.0, text: "Barreeffama Ingiliffaa fi Afaan Oromootiin walsimsiifame, akkasumas turjumaanota Afaan Mallattoo Itoophiyaa waliin ni dhiheessina." },
+      { start: 21.5, end: 27.0, text: "Barattoota qunnamtii 2G fi 3G qabaniif, paakeejonni toora-ala xiqqoon bakka kamittiyyuu akka barataniif gargaaru." },
+      { start: 27.5, end: 32.0, text: "[muuziqqaan dhume] Gara barnoota hunda-hammattootti imala keenya haa eegallu." }
+    ];
+
+    this.captionTracks.ti = [
+      { start: 0.0, end: 4.0, text: "እንቋዕ ናብ ኤዱብሪጅ ብደሓን መጻእኩም፡ ሓደ ትምህርቲ፣ ብኢንተርነትን ብኣካልን፣ ንኹሉ ዓቕሚ።" },
+      { start: 4.5, end: 9.0, text: "ኣብዚ ትምህርቲ፣ ተበጻሒ ናይ ሶፍትዌር ምህንድስናን ኩሉ-ሓቆፍ ዲዛይንን ንኢትዮጵያ ንምርምር።" },
+      { start: 9.5, end: 15.0, text: "ተበጻሕነት ማለት ጸማማት፣ ዓይነ-ስውራን ወይ ድሩት ናይ ምርኣይ ዓቕሚ ዘለዎም ተመሃሮ ብዘይ ዕንቅፋት ክምሃሩ ምኽኣሎም ምርግጋጽ እዩ።" },
+      { start: 15.5, end: 21.0, text: "ብእንግሊዝኛን ብትግርኛን ዝተሰማምዑ ጽሑፋት፣ ምስ ናይ ኢትዮጵያ ቋንቋ ምልክት ኣስተርጎምቲ ነቕርብ።" },
+      { start: 21.5, end: 27.0, text: "ናይ 2Gን 3Gን ርክብ ንዘለዎም ተመሃሮ፣ ንኣሽቱ ናይ ደገ-መስመር ፓኬጃት ኣብ ዝኾነ ቦታ ከጽንዑ የኽእሎም።" },
+      { start: 27.5, end: 32.0, text: "[ሙዚቃ ይውዳእ] ናብ ኩሉ-ሓቆፍ ትምህርቲ ጉዕዞና ንጀምር።" }
     ];
   }
 
@@ -209,6 +235,10 @@ class DbPlayer extends HTMLElement {
           if (cues.length > 0) {
             if (url.includes('.am.') || url.includes('/am') || url.includes('lang=am')) {
               this.captionTracks.am = cues;
+            } else if (url.includes('.om.') || url.includes('/om') || url.includes('lang=om')) {
+              this.captionTracks.om = cues;
+            } else if (url.includes('.ti.') || url.includes('/ti') || url.includes('lang=ti')) {
+              this.captionTracks.ti = cues;
             } else {
               this.captionTracks.en = cues;
             }
@@ -349,8 +379,159 @@ class DbPlayer extends HTMLElement {
         kQuestion: "ይህን የቁልፍ ሰሌዳ አቋራጭ መስኮት ለመክፈት",
         kEscape: "መስኮቶችን ዘግቶ ወደ ማጫወቻው ለመመለስ",
         closeDialog: "ዝጋ"
+      },
+      om: {
+        playerTitle: "Miidiyaa Taphachiisaa Qaqqabamaa EduBridge",
+        play: "Tapha",
+        pause: "Dhaabi",
+        seekBack: "Sekondii 10 duubatti",
+        seekForward: "Sekondii 10 fuulduratti",
+        mute: "Sagalee cufi",
+        unmute: "Sagalee bani",
+        captions: "Barreeffama",
+        captionsMenu: "Qindaa'ina Barreeffamaa",
+        captionsOn: "Barreeffamni mul'ata",
+        captionsOff: "Barreeffamni cufameera",
+        signLanguage: "Afaan Mallattoo",
+        signLanguageTitle: "Afaan Mallattoo Itoophiyaa (EthSL)",
+        signOpened: "Foddaan afaan mallattoo baname",
+        signClosed: "Foddaan afaan mallattoo cufame",
+        signMoveTL: "Mallattoo gara Oli-Bitaatti",
+        signMoveTR: "Mallattoo gara Oli-Mirgaatti",
+        signMoveBL: "Mallattoo gara Gadi-Bitaatti",
+        signMoveBR: "Mallattoo gara Gadi-Mirgaatti",
+        signLarger: "Foddaa Mallattoo Guddisi",
+        signSmaller: "Foddaa Mallattoo Xiqqeessi",
+        audioFirstTitle: "Haala Sagalee-Dursi (Osoo hin dubbisin dhaggeeffadhu)",
+        audioFirstBtn: "Dhaggeeffadhu",
+        audioFirstStop: "Dhaabi",
+        audioFirstRepeat: "Himicha irra-deebi'i",
+        audioFirstPrev: "Hima duraa",
+        audioFirstNext: "Hima itti-aanu",
+        transcriptTitle: "Barreeffama Qulqulluu Walsimsiifame",
+        transcriptOpen: "Foddaa Barreeffamaa Bani",
+        transcriptClose: "Foddaa Barreeffamaa Cufi",
+        audioOnlyBtn: "Haala Sagalee Qofa (3G)",
+        audioOnlyActive: "Haalli Sagalee Qofa Hojjechaa Jira",
+        downloadText: "Barreeffama qulqulluu buufadhu (.txt)",
+        downloadZip: "Paakeejii Toora-ala 3G buufadhu (.zip)",
+        downloadOffline: "Toora-alaaf buufadhu",
+        offlineSize: "Guddina: 1.8 MB (Sagalee + Barreeffama + HTML)",
+        fullscreen: "Iskiriinii Guutuu",
+        shortcuts: "Gargaarsa Qabduu Kiiboordii",
+        statusReady: "Taphachiisaan qophaa'eera.",
+        statusPlaying: "Viidiyoon taphachaa jira",
+        statusPaused: "Viidiyoon dhaabbateera",
+        langEn: "Barreeffama Ingiliffaa",
+        langAm: "Barreeffama Amaariffaa",
+        langOm: "Barreeffama Afaan Oromoo",
+        langTi: "Barreeffama Tigrinya",
+        sizeTitle: "Guddina Barreeffamaa",
+        themeTitle: "Bifa Dha'annoo Barreeffamaa",
+        themeWhiteBlack: "Adii Gurracha irratti",
+        themeYellowBlack: "Keelloo Gurracha irratti",
+        themeBlackYellow: "Gurracha Keelloo irratti",
+        badgeReviewed: "Namaan Mirkanaa'e",
+        badgeMachine: "Maashiniin Uumame",
+        closeSettings: "Qindaa'ina Cufi",
+        shortcutsHeading: "Qajeelfama Gabaabduu Kiiboordii",
+        shortcutsIntro: "Fayyadamtoonni maawusii malee kiiboordiidhaan fayyadamuu danda'u:",
+        kSpace: "Taphachiisi ykn dhaabi",
+        kArrows: "Sekondii 10 duubatti ykn fuulduratti",
+        kM: "Sagalee cufi ykn bani",
+        kC: "Barreeffama bani ykn cufi",
+        kS: "Foddaa afaan mallattoo bani ykn cufi",
+        kT: "Foddaa barreeffamaa bani ykn cufi",
+        kF: "Iskiriinii guutuu",
+        kQuestion: "Gargaarsa kiiboordii bani",
+        kEscape: "Foddaalee cufi",
+        closeDialog: "Cufi",
+        listen: "Dhaggeeffadhu"
+      },
+      ti: {
+        playerTitle: "ኤዱብሪጅ ተበጻሒ መወልዒ ሚድያ",
+        play: "ጻወት",
+        pause: "ኣቋርጽ",
+        seekBack: "10 ካልኢት ንድሕሪት",
+        seekForward: "10 ካልኢት ንቕድሚት",
+        mute: "ድምጺ ኣጥፍእ",
+        unmute: "ድምጺ ወልዕ",
+        captions: "ጽሑፍ",
+        captionsMenu: "ናይ ጽሑፍ ቅጥዕታት",
+        captionsOn: "ጽሑፍ ተኸፊቱ",
+        captionsOff: "ጽሑፍ ተዓጽዩ",
+        signLanguage: "ቋንቋ ምልክት",
+        signLanguageTitle: "ናይ ኢትዮጵያ ቋንቋ ምልክት (EthSL)",
+        signOpened: "መስኮት ቋንቋ ምልክት ተኸፊቱ",
+        signClosed: "መስኮት ቋንቋ ምልክት ተዓጽዩ",
+        signMoveTL: "መስኮት ምልክት ናብ ላዕሊ-ጸጋም",
+        signMoveTR: "መስኮት ምልክት ናብ ላዕሊ-የማን",
+        signMoveBL: "መስኮት ምልክት ናብ ታሕቲ-ጸጋም",
+        signMoveBR: "መስኮት ምልክት ናብ ታሕቲ-የማን",
+        signLarger: "መስኮት ምልክት ኣዕቢ",
+        signSmaller: "መስኮት ምልክት ኣንእስ",
+        audioFirstTitle: "ድምጺ-ቀዳማይ ኩነት (ብድምጺ ኣንብብ)",
+        audioFirstBtn: "ስማዕ",
+        audioFirstStop: "ኣቋርጽ",
+        audioFirstRepeat: "ሓሳብ ድገም",
+        audioFirstPrev: "ዝሓለፈ ሓሳብ",
+        audioFirstNext: "ዝቕጽል ሓሳብ",
+        transcriptTitle: "ዝተመሳሰለ ጽሑፍ",
+        transcriptOpen: "መስኮት ጽሑፍ ክፈት",
+        transcriptClose: "መስኮት ጽሑፍ ዕጾ",
+        audioOnlyBtn: "ድምጺ ጥራይ (3G)",
+        audioOnlyActive: "ድምጺ ጥራይ ኩነት ይዓዪ ኣሎ",
+        downloadText: "ጽሩይ ጽሑፍ ኣውርድ (.txt)",
+        downloadZip: "ናይ 3G ደገ-መስመር ፓኬጅ ኣውርድ (.zip)",
+        downloadOffline: "ብዘይ ኢንተርነት ንምጥቃም ኣውርድ",
+        offlineSize: "ዓቐን: 1.8 ሜጋባይት (ድምጺ + ጽሑፍ + ኤችቲኤምኤል)",
+        fullscreen: "ምሉእ ስክሪን",
+        shortcuts: "ሓገዝ ቁልፍታት ሰሌዳ",
+        statusReady: "መወልዒ ድሉው ኣሎ።",
+        statusPlaying: "ቪድዮ ይጻወት ኣሎ",
+        statusPaused: "ቪድዮ ደው ኢሉ ኣሎ",
+        langEn: "ናይ እንግሊዝኛ ጽሑፍ",
+        langAm: "ናይ ኣምሓርኛ ጽሑፍ",
+        langOm: "ናይ ኦሮምኛ ጽሑፍ",
+        langTi: "ናይ ትግርኛ ጽሑፍ",
+        sizeTitle: "ዓቐን ጽሑፍ",
+        themeTitle: "ናይ ጽሑፍ ሕብሪ",
+        themeWhiteBlack: "ጻዕዳ ኣብ ጸሊም",
+        themeYellowBlack: "ቢጫ ኣብ ጸሊም",
+        themeBlackYellow: "ጸሊም ኣብ ቢጫ",
+        badgeReviewed: "ብሰብ ዝተረጋገጸ",
+        badgeMachine: "ብማሽን ዝተሰርሐ",
+        closeSettings: "ቅጥዕታት ዕጾ",
+        shortcutsHeading: "መምርሒ ቁልፍታት ሰሌዳ",
+        shortcutsIntro: "ተጠቀምቲ ብዘይ ማውስ ብሰሌዳ ጥራይ ክጥቀሙ ይኽእሉ:",
+        kSpace: "ጻወት ወይ ኣቋርጽ",
+        kArrows: "10 ካልኢት ንድሕሪት ወይ ንቕድሚት",
+        kM: "ድምጺ ኣጥፍእ ወይ ወልዕ",
+        kC: "ጽሑፍ ወልዕ ወይ ኣጥፍእ",
+        kS: "መስኮት ቋንቋ ምልክት ወልዕ ወይ ኣጥፍእ",
+        kT: "መስኮት ጽሑፍ ክፈት ወይ ዕጾ",
+        kF: "ምሉእ ስክሪን",
+        kQuestion: "ሓገዝ ሰሌዳ ክፈት",
+        kEscape: "መስኮታት ዕጾ",
+        closeDialog: "ዕጾ",
+        listen: "ስማዕ"
       }
     };
+
+    try {
+      const candidates = [`./i18n/${this.currentLang}.json`, `/player/i18n/${this.currentLang}.json`];
+      for (const p of candidates) {
+        try {
+          const res = await fetch(p);
+          if (res.ok) {
+            const data = await res.json();
+            this.i18n = Object.assign({}, TRANSLATIONS[this.currentLang] || TRANSLATIONS.en, data);
+            this.render();
+            return;
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
 
     this.i18n = TRANSLATIONS[this.currentLang] || TRANSLATIONS.en;
     this.render();
@@ -503,9 +684,14 @@ class DbPlayer extends HTMLElement {
           line-height: 1.5;
         }
 
-        .caption-box[lang="am"] {
+        .caption-box[lang="am"],
+        .caption-box[lang="ti"] {
           line-height: 1.75;
           font-family: var(--bs-body-font-family, system-ui, "Noto Sans Ethiopic", sans-serif);
+        }
+
+        .caption-box[lang="om"] {
+          line-height: 1.5;
         }
 
         .size-100 { font-size: 1.1rem; }
@@ -1122,6 +1308,8 @@ class DbPlayer extends HTMLElement {
             <div class="btn-group" role="radiogroup" aria-label="${t.captions}">
               <button type="button" class="btn-option ${this.captionLang === 'am' ? 'active' : ''}" id="btn-lang-am" role="radio" aria-checked="${this.captionLang === 'am'}">አማርኛ (AM)</button>
               <button type="button" class="btn-option ${this.captionLang === 'en' ? 'active' : ''}" id="btn-lang-en" role="radio" aria-checked="${this.captionLang === 'en'}">English (EN)</button>
+              <button type="button" class="btn-option ${this.captionLang === 'om' ? 'active' : ''}" id="btn-lang-om" role="radio" aria-checked="${this.captionLang === 'om'}">Oromoo (OM)</button>
+              <button type="button" class="btn-option ${this.captionLang === 'ti' ? 'active' : ''}" id="btn-lang-ti" role="radio" aria-checked="${this.captionLang === 'ti'}">ትግርኛ (TI)</button>
               <button type="button" class="btn-option" id="btn-lang-off" role="radio" aria-checked="${!this.captionsVisible}">Off</button>
             </div>
           </fieldset>
@@ -1714,7 +1902,10 @@ class DbPlayer extends HTMLElement {
       if (cueBtns[idx]) cueBtns[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
       const utterance = new SpeechSynthesisUtterance(track[idx].text);
-      utterance.lang = this.captionLang === 'am' ? 'am-ET' : 'en-US';
+      if (this.captionLang === 'am') utterance.lang = 'am-ET';
+      else if (this.captionLang === 'ti') utterance.lang = 'ti-ET';
+      else if (this.captionLang === 'om') utterance.lang = 'om-ET';
+      else utterance.lang = 'en-US';
       utterance.rate = this.speechRate;
 
       utterance.onend = () => {
@@ -1937,24 +2128,36 @@ class DbPlayer extends HTMLElement {
     // Language radio buttons
     const btnLangAm = this.shadowRoot.querySelector('#btn-lang-am');
     const btnLangEn = this.shadowRoot.querySelector('#btn-lang-en');
+    const btnLangOm = this.shadowRoot.querySelector('#btn-lang-om');
+    const btnLangTi = this.shadowRoot.querySelector('#btn-lang-ti');
     const btnLangOff = this.shadowRoot.querySelector('#btn-lang-off');
 
     const updateLangSelection = (lang, visible) => {
       this.captionLang = lang;
       this.captionsVisible = visible;
-      captionBadge.textContent = this.captionLang === 'am'
-        ? (this.isAmharicReviewed ? '✓ ' + t.badgeReviewed : '⚡ ' + t.badgeMachine)
-        : '✓ English';
+      if (this.captionLang === 'am') {
+        captionBadge.textContent = this.isAmharicReviewed ? '✓ ' + (t.badgeReviewed || 'Human Reviewed') : '⚡ ' + (t.badgeMachine || 'Machine Generated');
+      } else if (this.captionLang === 'om') {
+        captionBadge.textContent = '✓ Afaan Oromoo';
+      } else if (this.captionLang === 'ti') {
+        captionBadge.textContent = '✓ Tigrinya';
+      } else {
+        captionBadge.textContent = '✓ English';
+      }
 
       captionsBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
       captionContainer.className = `caption-container size-${this.captionSize} theme-${this.captionTheme} ${visible ? '' : 'hidden'}`;
 
-      btnLangAm.classList.toggle('active', visible && lang === 'am');
-      btnLangAm.setAttribute('aria-checked', visible && lang === 'am' ? 'true' : 'false');
-      btnLangEn.classList.toggle('active', visible && lang === 'en');
-      btnLangEn.setAttribute('aria-checked', visible && lang === 'en' ? 'true' : 'false');
-      btnLangOff.classList.toggle('active', !visible);
-      btnLangOff.setAttribute('aria-checked', !visible ? 'true' : 'false');
+      btnLangAm?.classList.toggle('active', visible && lang === 'am');
+      btnLangAm?.setAttribute('aria-checked', visible && lang === 'am' ? 'true' : 'false');
+      btnLangEn?.classList.toggle('active', visible && lang === 'en');
+      btnLangEn?.setAttribute('aria-checked', visible && lang === 'en' ? 'true' : 'false');
+      btnLangOm?.classList.toggle('active', visible && lang === 'om');
+      btnLangOm?.setAttribute('aria-checked', visible && lang === 'om' ? 'true' : 'false');
+      btnLangTi?.classList.toggle('active', visible && lang === 'ti');
+      btnLangTi?.setAttribute('aria-checked', visible && lang === 'ti' ? 'true' : 'false');
+      btnLangOff?.classList.toggle('active', !visible);
+      btnLangOff?.setAttribute('aria-checked', !visible ? 'true' : 'false');
 
       // Re-render transcript cues in selected language
       const cueList = this.shadowRoot.querySelector('#transcript-cue-list');
@@ -1963,13 +2166,16 @@ class DbPlayer extends HTMLElement {
         attachCueClickListeners();
       }
 
-      statusEl.textContent = visible ? (lang === 'am' ? t.langAm : t.langEn) : t.captionsOff;
+      const langMap = { am: t.langAm || 'Amharic', en: t.langEn || 'English', om: t.langOm || 'Afaan Oromoo', ti: t.langTi || 'Tigrinya' };
+      statusEl.textContent = visible ? (langMap[lang] || lang) : t.captionsOff;
       this.dispatchPrefs();
     };
 
-    btnLangAm.addEventListener('click', () => updateLangSelection('am', true));
-    btnLangEn.addEventListener('click', () => updateLangSelection('en', true));
-    btnLangOff.addEventListener('click', () => updateLangSelection(this.captionLang, false));
+    btnLangAm?.addEventListener('click', () => updateLangSelection('am', true));
+    btnLangEn?.addEventListener('click', () => updateLangSelection('en', true));
+    btnLangOm?.addEventListener('click', () => updateLangSelection('om', true));
+    btnLangTi?.addEventListener('click', () => updateLangSelection('ti', true));
+    btnLangOff?.addEventListener('click', () => updateLangSelection(this.captionLang, false));
 
     // Size selection
     this.shadowRoot.querySelectorAll('[data-size]').forEach((btn) => {

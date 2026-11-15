@@ -79,22 +79,37 @@ router.get('/lessons/:id', async (req, res, next) => {
 
   if (process.env.MOCK_API === 'true') {
     const mock = getMockPublicVideo(id, req);
-    const tracks = [
-      { kind: 'captions', lang: 'en', url: mock.captions.en.url, reviewStatus: mock.captions.en.reviewStatus },
-      { kind: 'captions', lang: 'am', url: mock.captions.am.url, reviewStatus: mock.captions.am.reviewStatus },
+    const tracks = [];
+    ['en', 'am', 'om', 'ti'].forEach((lang) => {
+      if (mock.captions && mock.captions[lang]) {
+        tracks.push({
+          kind: 'captions',
+          lang,
+          url: mock.captions[lang].url,
+          reviewStatus: mock.captions[lang].reviewStatus
+        });
+      }
+    });
+    tracks.push(
       { kind: 'sign', url: mock.signVideoUrl },
       { kind: 'audio', url: mock.audioUrl }
-    ];
+    );
     if (mock.audioDescriptionUrl) {
       tracks.push({ kind: 'audio-description', url: mock.audioDescriptionUrl });
     }
+    const captionUrls = ['en', 'am', 'om', 'ti']
+      .map((l) => mock.captions?.[l]?.url)
+      .filter(Boolean);
+    const approved = {
+      en: mock.captions?.en?.reviewStatus === 'human-reviewed',
+      am: mock.captions?.am?.reviewStatus === 'human-reviewed',
+      om: mock.captions?.om?.reviewStatus === 'human-reviewed',
+      ti: mock.captions?.ti?.reviewStatus === 'human-reviewed'
+    };
     return res.json({
       ...mock,
-      captionUrls: [mock.captions.en.url, mock.captions.am.url],
-      approved: {
-        en: mock.captions.en.reviewStatus === 'human-reviewed',
-        am: mock.captions.am.reviewStatus === 'human-reviewed'
-      },
+      captionUrls,
+      approved,
       tracks,
       offlinePackSizeBytes: 1048576 // 1MB mock size
     });
@@ -133,7 +148,7 @@ router.get('/lessons/:id', async (req, res, next) => {
     const captionUrls = [];
     const tracks = [];
 
-    ['en', 'am', 'om'].forEach((lang) => {
+    ['en', 'am', 'om', 'ti'].forEach((lang) => {
       const track = video.captions && video.captions[lang];
       if (track && (track.vttUrl || track.vttPath || track.url)) {
         const absoluteUrl = toAbsoluteUrl(track.vttUrl || track.url || `/uploads/captions/${video._id}_${lang}.vtt`, req);
@@ -199,7 +214,9 @@ router.get('/lessons/:id', async (req, res, next) => {
       captionUrls,
       approved: {
         en: video.captions?.en?.reviewStatus === 'human-reviewed',
-        am: video.captions?.am?.reviewStatus === 'human-reviewed'
+        am: video.captions?.am?.reviewStatus === 'human-reviewed',
+        om: video.captions?.om?.reviewStatus === 'human-reviewed',
+        ti: video.captions?.ti?.reviewStatus === 'human-reviewed'
       },
       tracks,
       transcript: video.transcript || video.transcriptText || '',
@@ -218,14 +235,15 @@ router.get('/lessons/:id', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/lessons/:id/transcript?lang=en|am - Raw text/plain transcript
+// GET /api/v1/lessons/:id/transcript?lang=en|am|om|ti - Raw text/plain transcript
 router.get('/lessons/:id/transcript', async (req, res, next) => {
   const { id } = req.params;
   const lang = (req.query.lang || 'en').toLowerCase();
+  const allowed = ['en', 'am', 'om', 'ti'];
 
-  if (lang !== 'en' && lang !== 'am') {
+  if (!allowed.includes(lang)) {
     return res.status(400).json({
-      error: `Invalid transcript language "${lang}". Supported languages are "en" and "am".`,
+      error: `Invalid transcript language "${lang}". Supported languages are: ${allowed.join(', ')}.`,
       code: 'INVALID_LANGUAGE'
     });
   }
@@ -234,6 +252,12 @@ router.get('/lessons/:id/transcript', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     if (lang === 'am') {
       return res.send('እንኳን ወደዚህ ተደራሽ የታዳሽ ኃይል ትምህርት በደህና መጡ። ዛሬ የፀሐይ የፎቶቮልታይክ ሴሎችን እንመረምራለን።');
+    }
+    if (lang === 'om') {
+      return res.send("Baga gara barnoota anniisaa haaromfamuu qaqqabamaa kanaatti nagaan dhuftan. Har'a seelota soolaarii footoovooltaayikii fi akkamitti elektirikii qulqulluu akka maddisiisan ni qoranna.");
+    }
+    if (lang === 'ti') {
+      return res.send('እንቋዕ ናብዚ ተበጻሒ ናይ ዝሕደስ ሓይሊ ትምህርቲ ብደሓን መጻእኩም። ሎሚ ናይ ፀሓይ ፎቶቮልታይክ ሴላትን ከመይ ጌሮም ጽሩይ ኤሌክትሪክ ከም ዘመንጩን ክንምሃር ኢና።');
     }
     return res.send('Welcome to this accessible lesson on renewable energy. Today we will explore solar photovoltaic cells and how they generate clean electricity.');
   }
@@ -267,24 +291,22 @@ router.get('/lessons/:id/transcript', async (req, res, next) => {
       return res.send(text);
     }
 
-    if (lang === 'am') {
-      const amTrack = video.captions?.am;
-      let amText = null;
-      if (amTrack && amTrack.vttPath && fs.existsSync(amTrack.vttPath)) {
-        try {
-          const vtt = fs.readFileSync(amTrack.vttPath, 'utf8');
-          amText = vtt.replace(/^WEBVTT[^\n]*\n+/i, '').replace(/\d{2}:\d{2}:[^\n]+/g, '').trim();
-        } catch (e) {}
-      }
-      if (!amText) {
-        return res.status(404).json({
-          error: 'No Amharic transcript exists for this lesson.',
-          code: 'TRANSCRIPT_NOT_FOUND'
-        });
-      }
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      return res.send(amText);
+    const track = video.captions && video.captions[lang];
+    let langText = null;
+    if (track && track.vttPath && fs.existsSync(track.vttPath)) {
+      try {
+        const vtt = fs.readFileSync(track.vttPath, 'utf8');
+        langText = vtt.replace(/^WEBVTT[^\n]*\n+/i, '').replace(/\d{2}:\d{2}:[^\n]+/g, '').trim();
+      } catch (e) {}
     }
+    if (!langText) {
+      return res.status(404).json({
+        error: `No ${lang} transcript exists for this lesson.`,
+        code: 'TRANSCRIPT_NOT_FOUND'
+      });
+    }
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.send(langText);
   } catch (err) {
     next(err);
   }
@@ -301,7 +323,7 @@ router.get('/lessons/:id/offline-pack', (req, res, next) => {
 router.post('/lessons/:id/captions', studioKey, async (req, res, next) => {
   const { id } = req.params;
   const { lang, vtt } = req.body;
-  const allowedLangs = ['en', 'am', 'om'];
+  const allowedLangs = ['en', 'am', 'om', 'ti'];
 
   if (!allowedLangs.includes(lang)) {
     return res.status(400).json({
@@ -418,7 +440,8 @@ router.delete('/lessons/:id', studioKey, async (req, res, next) => {
       video.transcriptPath,
       video.captions?.en?.vttPath,
       video.captions?.am?.vttPath,
-      video.captions?.om?.vttPath
+      video.captions?.om?.vttPath,
+      video.captions?.ti?.vttPath
     ].filter(Boolean);
 
     // Delete files safely

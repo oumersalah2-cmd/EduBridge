@@ -211,6 +211,14 @@ describe('Contract Parity & Security Tests (Mock vs Real Mode)', () => {
           am: {
             vttUrl: '/assets/demo/demo_lesson_am.vtt',
             reviewStatus: 'machine-generated'
+          },
+          om: {
+            vttUrl: '/assets/demo/demo_lesson_om.vtt',
+            reviewStatus: 'machine-generated'
+          },
+          ti: {
+            vttUrl: '/assets/demo/demo_lesson_ti.vtt',
+            reviewStatus: 'machine-generated'
           }
         },
         transcript: 'Full transcript for accessibility.',
@@ -252,6 +260,14 @@ describe('Contract Parity & Security Tests (Mock vs Real Mode)', () => {
           },
           am: {
             vttUrl: '/assets/demo/demo_lesson_am.vtt',
+            reviewStatus: 'machine-generated'
+          },
+          om: {
+            vttUrl: '/assets/demo/demo_lesson_om.vtt',
+            reviewStatus: 'machine-generated'
+          },
+          ti: {
+            vttUrl: '/assets/demo/demo_lesson_ti.vtt',
             reviewStatus: 'machine-generated'
           }
         },

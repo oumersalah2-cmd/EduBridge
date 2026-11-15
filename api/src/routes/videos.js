@@ -100,7 +100,9 @@ videosRouter.get('/', async (req, res, next) => {
     res.json(videos.map((v) => {
       const captionUrls = [
         v.captions?.en?.vttUrl ? toAbsoluteUrl(v.captions.en.vttUrl, req) : null,
-        v.captions?.am?.vttUrl ? toAbsoluteUrl(v.captions.am.vttUrl, req) : null
+        v.captions?.am?.vttUrl ? toAbsoluteUrl(v.captions.am.vttUrl, req) : null,
+        v.captions?.om?.vttUrl ? toAbsoluteUrl(v.captions.om.vttUrl, req) : null,
+        v.captions?.ti?.vttUrl ? toAbsoluteUrl(v.captions.ti.vttUrl, req) : null
       ].filter(Boolean);
 
       return {
@@ -115,7 +117,9 @@ videosRouter.get('/', async (req, res, next) => {
         captionUrls,
         approved: {
           en: v.captions?.en?.reviewStatus === 'human-reviewed',
-          am: v.captions?.am?.reviewStatus === 'human-reviewed'
+          am: v.captions?.am?.reviewStatus === 'human-reviewed',
+          om: v.captions?.om?.reviewStatus === 'human-reviewed',
+          ti: v.captions?.ti?.reviewStatus === 'human-reviewed'
         },
         createdAt: v.createdAt
       };
@@ -208,7 +212,9 @@ videosRouter.get('/:id/preview', studioKey, async (req, res, next) => {
       status: 'review',
       rawCaptions: {
         en: 'WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome to this accessible lesson on renewable energy.\n\n00:00:04.500 --> 00:00:09.000\nToday we will explore solar photovoltaic cells and how they generate clean electricity.',
-        am: 'WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንኳን ወደዚህ ተደራሽ የታዳሽ ኃይል ትምህርት በደህና መጡ።\n\n00:00:04.500 --> 00:00:09.000\nዛሬ የፀሐይ የፎቶቮልታይክ ሴሎችን እና እንዴት ንጹህ ኤሌክትሪክ እንደሚያመነጩ እንመረምራለን።'
+        am: 'WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንኳን ወደዚህ ተደራሽ የታዳሽ ኃይል ትምህርት በደህና መጡ።\n\n00:00:04.500 --> 00:00:09.000\nዛሬ የፀሐይ የፎቶቮልታይክ ሴሎችን እና እንዴት ንጹህ ኤሌክትሪክ እንደሚያመነጩ እንመረምራለን።',
+        om: 'WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nBaga gara barnoota anniisaa haaromfamuu qaqqabamaa kanaatti nagaan dhuftan.\n\n00:00:04.500 --> 00:00:09.000\nHar\'a waa\'ee seelota soolaarii footoovooltaayikii fi akkamitti elektirikii qulqulluu akka maddisiisan ni qoranna.',
+        ti: 'WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንቋዕ ናብዚ ብዛዕባ ዝሕደስ ሓይሊ ዝተዳለወ ተበጻሒ ትምህርቲ ብደሓን መጻእኩም።\n\n00:00:04.500 --> 00:00:09.000\nሎሚ ብዛዕባ ናይ ፀሓይ ፎቶቮልታይክ ሴላትን ከመይ ጌሮም ጽሩይ ኤሌክትሪክ ከም ዘመንጩን ክንምሃር ኢና።'
       }
     });
   }
@@ -242,9 +248,9 @@ videosRouter.get('/:id/preview', studioKey, async (req, res, next) => {
     }
 
     const captions = {};
-    const rawCaptions = { en: null, am: null };
+    const rawCaptions = { en: null, am: null, om: null, ti: null };
 
-    ['en', 'am', 'om'].forEach((lang) => {
+    ['en', 'am', 'om', 'ti'].forEach((lang) => {
       const track = video.captions && video.captions[lang];
       if (track && (track.vttUrl || track.vttPath || track.url)) {
         captions[lang] = {
@@ -336,7 +342,7 @@ videosRouter.get('/:id', async (req, res, next) => {
 // GET /api/videos/:id/captions/:lang - Retrieve WebVTT file directly
 videosRouter.get('/:id/captions/:lang', async (req, res, next) => {
   const { id, lang } = req.params;
-  const allowed = ['en', 'am', 'om'];
+  const allowed = ['en', 'am', 'om', 'ti'];
   if (!allowed.includes(lang)) {
     return res.status(400).json({
       error: `Invalid language code "${lang}". Supported: ${allowed.join(', ')}.`,
@@ -348,6 +354,12 @@ videosRouter.get('/:id/captions/:lang', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     if (lang === 'am') {
       return res.send('WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንኳን ወደዚህ ተደራሽ ትምህርት በደህና መጡ።');
+    }
+    if (lang === 'om') {
+      return res.send("WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nBaga gara barnoota qaqqabamaa kanaatti nagaan dhuftan.");
+    }
+    if (lang === 'ti') {
+      return res.send('WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንቋዕ ናብዚ ተበጻሒ ትምህርቲ ብደሓን መጻእኩም።');
     }
     return res.send('WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome to this accessible lesson.');
   }
@@ -403,7 +415,7 @@ videosRouter.post('/:id/retry', studioKey, async (req, res, next) => {
 // PUT /api/videos/:id/captions/:lang - Save human-edited WebVTT (X-Studio-Key, resets approval)
 videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
   const { id, lang } = req.params;
-  const allowedLangs = ['en', 'am', 'om'];
+  const allowedLangs = ['en', 'am', 'om', 'ti'];
 
   if (!allowedLangs.includes(lang)) {
     return res.status(400).json({
@@ -477,7 +489,7 @@ videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
 // POST /api/videos/:id/approve/:lang - Mark caption track human-approved (X-Studio-Key)
 videosRouter.post('/:id/approve/:lang', studioKey, async (req, res, next) => {
   const { id, lang } = req.params;
-  const allowedLangs = ['en', 'am', 'om'];
+  const allowedLangs = ['en', 'am', 'om', 'ti'];
 
   if (!allowedLangs.includes(lang)) {
     return res.status(400).json({
@@ -648,7 +660,7 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
     }
 
     const captions = {};
-    ['en', 'am', 'om'].forEach((lang) => {
+    ['en', 'am', 'om', 'ti'].forEach((lang) => {
       const track = video.captions && video.captions[lang];
       if (track && (track.vttUrl || track.vttPath || track.url)) {
         captions[lang] = {

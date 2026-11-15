@@ -4,6 +4,8 @@ import { approveLanguage } from './api.js';
 const LANGS = [
   { code: 'en', name: 'English', index: 0 },
   { code: 'am', name: 'Amharic', index: 1 },
+  { code: 'om', name: 'Afaan Oromoo', index: 2 },
+  { code: 'ti', name: 'Tigrinya', index: 3 },
 ];
 
 export default function CaptionsStep({ lesson, onChange, announce }) {
@@ -31,8 +33,8 @@ export default function CaptionsStep({ lesson, onChange, announce }) {
       ) : (
         <ul className="mt-4 space-y-4">
           {LANGS.map((lang) => {
-            const url = lesson.captionUrls[lang.index];
-            const approved = lesson.approved[lang.code];
+            const url = (lesson.captionUrls && (lesson.captionUrls[lang.index] || lesson.captionUrls.find((u) => u && u.includes(`_${lang.code}.vtt`)))) || '';
+            const approved = Boolean(lesson.approved && lesson.approved[lang.code]);
             return (
               <li key={lang.code} className="rounded border-2 border-slate-400 p-3">
                 <h3 className="text-xl font-semibold">{lang.name} captions</h3>

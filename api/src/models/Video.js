@@ -23,7 +23,7 @@ const VideoSchema = new mongoose.Schema({
   title: { type: String, default: 'Untitled Lesson' },
   description: { type: String, default: '' },
   duration: { type: Number, default: 0 },
-  languages: { type: [String], default: ['en', 'am'] },
+  languages: { type: [String], default: ['en', 'am', 'om', 'ti'] },
   status: {
     type: String,
     enum: ['uploaded', 'live', 'processing', 'review', 'published', 'failed'],
@@ -57,7 +57,8 @@ const VideoSchema = new mongoose.Schema({
   captions: {
     en: { type: CaptionTrackSchema, default: () => ({}) },
     am: { type: CaptionTrackSchema, default: () => ({}) },
-    om: { type: CaptionTrackSchema, default: () => ({}) }
+    om: { type: CaptionTrackSchema, default: () => ({}) },
+    ti: { type: CaptionTrackSchema, default: () => ({}) }
   },
   captionUrls: { type: [String], default: [] },
   transcript: { type: String, default: '' },

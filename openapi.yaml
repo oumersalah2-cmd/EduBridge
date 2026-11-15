@@ -115,7 +115,7 @@ components:
           example: "mock-vid-demo-01"
         lang:
           type: string
-          enum: [en, am, om]
+          enum: [en, am, om, ti]
           example: "en"
         status:
           type: string
@@ -141,7 +141,7 @@ components:
           example: "mock-vid-demo-01"
         lang:
           type: string
-          enum: [en, am, om]
+          enum: [en, am, om, ti]
           example: "en"
         reviewStatus:
           type: string
@@ -796,7 +796,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [en, am, om]
+            enum: [en, am, om, ti]
       responses:
         '200':
           description: WebVTT file content
@@ -812,7 +812,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Save Human-Edited WebVTT Captions
-      description: Saves human-edited WebVTT captions for en, am, or om. Resets review approval to unapproved.
+      description: Saves human-edited WebVTT captions for en, am, om, or ti. Resets review approval to unapproved.
       operationId: saveCaptions
       security:
         - StudioKeyAuth: []
@@ -827,7 +827,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [en, am, om]
+            enum: [en, am, om, ti]
       requestBody:
         required: true
         content:
@@ -881,7 +881,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [en, am, om]
+            enum: [en, am, om, ti]
       responses:
         '200':
           description: Caption track approved
@@ -1476,9 +1476,9 @@ paths:
           required: false
           schema:
             type: string
-            enum: [en, am]
+            enum: [en, am, om, ti]
             default: en
-          description: Language code (en or am)
+          description: Language code (en, am, om, or ti)
       responses:
         '200':
           description: Plain-text transcript
@@ -1556,7 +1556,7 @@ paths:
               properties:
                 lang:
                   type: string
-                  enum: [en, am, om]
+                  enum: [en, am, om, ti]
                   example: "am"
                 vtt:
                   type: string

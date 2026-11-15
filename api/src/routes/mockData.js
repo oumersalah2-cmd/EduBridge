@@ -135,6 +135,14 @@ function getMockPublicVideo(id = 'mock-video-demo-01', req) {
       am: {
         url: `${base}/assets/demo/demo_lesson_am.vtt`,
         reviewStatus: 'machine-generated'
+      },
+      om: {
+        url: `${base}/assets/demo/demo_lesson_om.vtt`,
+        reviewStatus: 'machine-generated'
+      },
+      ti: {
+        url: `${base}/assets/demo/demo_lesson_ti.vtt`,
+        reviewStatus: 'machine-generated'
       }
     },
     transcript: 'Welcome to this accessible lesson on renewable energy. Today we will explore solar photovoltaic cells and how they generate clean electricity. Notice how sunlight frees electrons in the semiconductor material.',

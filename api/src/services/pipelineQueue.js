@@ -205,52 +205,31 @@ class PipelineQueue {
       };
     }
 
-    // Amharic Caption Generation: Translate English segments or transcribe directly if AMHARIC_MODE=direct
-    const isAmHumanReviewed = video.captions?.am?.reviewStatus === 'human-reviewed';
-    const amVttFilename = `${video._id}_am.vtt`;
-    const amVttPath = path.join(CAPTIONS_DIR, amVttFilename);
+    // Multilingual Caption Generation (Amharic 'am', Afaan Oromoo 'om', Tigrinya 'ti')
+    const additionalLangs = ['am', 'om', 'ti'];
+    for (const targetLang of additionalLangs) {
+      const isReviewed = video.captions?.[targetLang]?.reviewStatus === 'human-reviewed';
+      const langVttFilename = `${video._id}_${targetLang}.vtt`;
+      const langVttPath = path.join(CAPTIONS_DIR, langVttFilename);
 
-    if (!isAmHumanReviewed) {
-      const amharicMode = process.env.AMHARIC_MODE || 'translate'; // 'translate', 'direct', or 'off'
-      if (amharicMode === 'direct') {
+      if (!isReviewed) {
         try {
-          console.log('[Pipeline] Generating Amharic draft caption track via Whisper...');
-          const amResult = await whisperService.transcribeAudio(wavPath, {
-            model: process.env.WHISPER_MODEL || 'base',
-            language: 'am'
-          });
-          const amSegments = amResult.segments || [];
-          if (amSegments.length > 0) {
-            const amVttContent = vttConverter.segmentsToWebVTT(amSegments);
-            fs.writeFileSync(amVttPath, amVttContent, 'utf8');
+          console.log(`[Pipeline] Translating English segments into ${targetLang} preserving timestamps...`);
+          const langSegments = await translateSegments(segments, targetLang, 'en');
+          if (langSegments.length > 0) {
+            const langVttContent = vttConverter.segmentsToWebVTT(langSegments);
+            fs.writeFileSync(langVttPath, langVttContent, 'utf8');
 
-            video.captions.am = {
-              vttPath: amVttPath,
-              vttUrl: `/uploads/captions/${amVttFilename}`,
-              status: 'machine-generated',
-              reviewStatus: 'machine-generated'
-            };
-          }
-        } catch (amErr) {
-          console.warn('[Pipeline] Amharic draft transcription skipped or failed:', amErr.message);
-        }
-      } else if (amharicMode !== 'off') {
-        try {
-          console.log('[Pipeline] Translating English segments into Amharic preserving timestamps...');
-          const amSegments = await translateSegments(segments, 'am', 'en');
-          if (amSegments.length > 0) {
-            const amVttContent = vttConverter.segmentsToWebVTT(amSegments);
-            fs.writeFileSync(amVttPath, amVttContent, 'utf8');
-
-            video.captions.am = {
-              vttPath: amVttPath,
-              vttUrl: `/uploads/captions/${amVttFilename}`,
+            video.captions = video.captions || {};
+            video.captions[targetLang] = {
+              vttPath: langVttPath,
+              vttUrl: `/uploads/captions/${langVttFilename}`,
               status: 'machine-generated',
               reviewStatus: 'machine-generated'
             };
           }
         } catch (transErr) {
-          console.warn('[Pipeline] Amharic translation skipped or failed:', transErr.message);
+          console.warn(`[Pipeline] ${targetLang} translation skipped or failed:`, transErr.message);
         }
       }
     }
@@ -261,8 +240,10 @@ class PipelineQueue {
 
     // Populate helper captionUrls array
     video.captionUrls = [
-      video.captions.en?.vttUrl,
-      video.captions.am?.vttUrl
+      video.captions?.en?.vttUrl,
+      video.captions?.am?.vttUrl,
+      video.captions?.om?.vttUrl,
+      video.captions?.ti?.vttUrl
     ].filter(Boolean);
 
     // Step 6: Review ready at 100%
