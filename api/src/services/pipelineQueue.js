@@ -215,19 +215,17 @@ class PipelineQueue {
       if (!isReviewed) {
         try {
           console.log(`[Pipeline] Translating English segments into ${targetLang} preserving timestamps...`);
-          const langSegments = await translateSegments(segments, targetLang, 'en');
-          if (langSegments.length > 0) {
-            const langVttContent = vttConverter.segmentsToWebVTT(langSegments);
-            fs.writeFileSync(langVttPath, langVttContent, 'utf8');
+          const langSegments = segments.length > 0 ? await translateSegments(segments, targetLang, 'en') : [];
+          const langVttContent = vttConverter.segmentsToWebVTT(langSegments);
+          fs.writeFileSync(langVttPath, langVttContent, 'utf8');
 
-            video.captions = video.captions || {};
-            video.captions[targetLang] = {
-              vttPath: langVttPath,
-              vttUrl: `/uploads/captions/${langVttFilename}`,
-              status: 'machine-generated',
-              reviewStatus: 'machine-generated'
-            };
-          }
+          video.captions = video.captions || {};
+          video.captions[targetLang] = {
+            vttPath: langVttPath,
+            vttUrl: `/uploads/captions/${langVttFilename}`,
+            status: 'machine-generated',
+            reviewStatus: 'machine-generated'
+          };
         } catch (transErr) {
           console.warn(`[Pipeline] ${targetLang} translation skipped or failed:`, transErr.message);
         }

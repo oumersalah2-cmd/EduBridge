@@ -7,6 +7,14 @@ function getPythonPath() {
   if (fs.existsSync(venvPython)) {
     return venvPython;
   }
+  const localApiVenv = path.resolve(__dirname, '../../.venv/bin/python3');
+  if (fs.existsSync(localApiVenv)) {
+    return localApiVenv;
+  }
+  const rootVenv = path.resolve(__dirname, '../../../api/.venv/bin/python3');
+  if (fs.existsSync(rootVenv)) {
+    return rootVenv;
+  }
   return process.env.PYTHON_BIN || 'python3';
 }
 
@@ -40,18 +48,6 @@ function transcribeAudio(wavPath, options = {}) {
       (err, stdout, stderr) => {
         if (err) {
           console.error('[WhisperService] Technical transcription error:', stderr || err.message);
-          if (stderr && (stderr.includes('faster-whisper') || stderr.includes('ModuleNotFoundError') || stderr.includes('not installed'))) {
-            console.warn('[WhisperService] faster-whisper is not installed in local environment; providing fallback educational segments for testing.');
-            return resolve({
-              segments: [
-                { start: 0.0, end: 4.0, text: 'Welcome to this accessible lesson on renewable energy.' },
-                { start: 4.5, end: 9.0, text: 'Today we will explore solar photovoltaic cells and how they generate clean electricity.' },
-                { start: 9.5, end: 15.0, text: 'Photovoltaic cells absorb photons and release electrons to produce electric current.' },
-                { start: 15.5, end: 20.0, text: 'This direct current is converted to alternating current using an inverter.' }
-              ],
-              detected_language: language
-            });
-          }
           return reject(new Error('Automatic captioning could not be completed for this audio.'));
         }
 
