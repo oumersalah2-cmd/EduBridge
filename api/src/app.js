@@ -61,6 +61,17 @@ app.use('/uploads', express.static(UPLOADS_DIR, staticHeaderOptions));
 const DEMO_ASSETS_DIR = path.resolve(__dirname, '../assets/demo');
 app.use('/assets/demo', express.static(DEMO_ASSETS_DIR, staticHeaderOptions));
 
+const PLAYER_DIR = path.resolve(__dirname, '../../player');
+if (fs.existsSync(PLAYER_DIR)) {
+  app.use('/player', express.static(PLAYER_DIR, staticHeaderOptions));
+  app.use('/module', express.static(PLAYER_DIR, staticHeaderOptions));
+}
+
+const DEMO_DIR = path.resolve(__dirname, '../../demo');
+if (fs.existsSync(DEMO_DIR)) {
+  app.use('/demo', express.static(DEMO_DIR, staticHeaderOptions));
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });

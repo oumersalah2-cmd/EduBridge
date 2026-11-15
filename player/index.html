@@ -375,6 +375,19 @@
     </main>
 
     <script>
+      // Dynamic lesson loading from URL query param (?video=<id> or ?lesson=<id>)
+      const urlParams = new URLSearchParams(window.location.search);
+      const videoId = urlParams.get('video') || urlParams.get('id') || urlParams.get('lesson');
+      const playerEl = document.querySelector('db-player');
+      if (playerEl && videoId) {
+        playerEl.removeAttribute('src');
+        playerEl.removeAttribute('captions');
+        playerEl.removeAttribute('sign');
+        playerEl.setAttribute('lesson', videoId);
+        const apiOrigin = window.location.port === '4000' ? '' : 'http://localhost:4000';
+        playerEl.setAttribute('api', `${apiOrigin}/api`);
+      }
+
       // Tab switching
       const tabRecorded = document.getElementById('tab-recorded');
       const tabLive = document.getElementById('tab-live');
