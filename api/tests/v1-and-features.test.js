@@ -8,7 +8,7 @@ const Webhook = require('../src/models/Webhook');
 const sseHub = require('../src/services/sseHub');
 
 const TEST_KEY = 'change-me-to-a-long-random-string';
-const UPLOADS_DIR = path.resolve(__dirname, '../../uploads');
+const UPLOADS_DIR = path.resolve(__dirname, '../uploads');
 
 describe('EduBridge v1 Layer, Live Archive, Webhooks & Security Tests', () => {
   beforeAll(() => {
