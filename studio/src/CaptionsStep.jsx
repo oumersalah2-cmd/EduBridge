@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { approveLanguage } from './api.js';
 
 const LANGS = [
@@ -7,6 +7,49 @@ const LANGS = [
   { code: 'om', name: 'Afaan Oromoo', index: 2 },
   { code: 'ti', name: 'Tigrinya', index: 3 },
 ];
+
+function CaptionPreview({ url, rawText, langName }) {
+  const [text, setText] = useState(rawText || '');
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (rawText) setText(rawText);
+  }, [rawText]);
+
+  async function handleToggle() {
+    if (!open && !text && url) {
+      setLoading(true);
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const t = await res.text();
+          setText(t);
+        }
+      } catch (e) {}
+      setLoading(false);
+    }
+    setOpen(!open);
+  }
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="inline-flex min-h-9 items-center rounded border border-slate-400 bg-slate-100 px-3 text-sm font-semibold text-slate-800 hover:bg-slate-200"
+        aria-expanded={open}
+      >
+        {open ? `▲ Hide ${langName} text` : `👁 View generated ${langName} text`}
+      </button>
+      {open && (
+        <div className="mt-2 max-h-52 overflow-y-auto rounded border-2 border-slate-400 bg-slate-900 p-3 font-mono text-sm text-green-300 whitespace-pre-wrap">
+          {loading ? 'Loading caption lines...' : (text || 'No caption text found.')}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CaptionsStep({ lesson, onChange, announce }) {
   const [busy, setBusy] = useState('');
@@ -33,15 +76,19 @@ export default function CaptionsStep({ lesson, onChange, announce }) {
       ) : (
         <ul className="mt-4 space-y-4">
           {LANGS.map((lang) => {
-            const url = (lesson.captionUrls && (lesson.captionUrls[lang.index] || lesson.captionUrls.find((u) => u && u.includes(`_${lang.code}.vtt`)))) || '';
+            const url = (lesson.captionUrls && (lesson.captionUrls.find((u) => u && (u.includes(`_${lang.code}.`) || u.includes(`.${lang.code}.`))) || lesson.captionUrls[lang.index])) || (lesson.id ? `/api/videos/${lesson.id}/captions/${lang.code}` : '');
+            const raw = lesson.rawCaptions && lesson.rawCaptions[lang.code];
             const approved = Boolean(lesson.approved && lesson.approved[lang.code]);
             return (
               <li key={lang.code} className="rounded border-2 border-slate-400 p-3">
                 <h3 className="text-xl font-semibold">{lang.name} captions</h3>
                 <p className="mt-1 text-lg">
-                  Status: {approved ? 'Human reviewed' : 'Machine generated, not yet reviewed'}
+                  Status: <span className={approved ? 'font-bold text-green-800' : 'text-slate-700'}>{approved ? '✓ Human reviewed' : '⚡ Machine generated, not yet reviewed'}</span>
                 </p>
-                <div className="mt-3 flex flex-wrap gap-3">
+
+                <CaptionPreview url={url} rawText={raw} langName={lang.name} />
+
+                <div className="mt-4 flex flex-wrap gap-3">
                   {url && (
                     <a
                       href={`/editor/index.html?id=${encodeURIComponent(lesson.id)}&lang=${lang.code}&video=${encodeURIComponent(lesson.videoUrl || '')}&src=${encodeURIComponent(url)}`}
@@ -53,7 +100,7 @@ export default function CaptionsStep({ lesson, onChange, announce }) {
                   )}
                   <button
                     type="button" onClick={() => !approved && busy === '' && approve(lang)}
-                    className={`min-h-11 rounded bg-blue-800 px-5 text-lg font-semibold text-white ${approved ? 'opacity-60' : ''}`}
+                    className={`min-h-11 rounded bg-blue-800 px-5 text-lg font-semibold text-white ${approved ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-900'}`}
                     aria-disabled={approved || busy !== ''}
                   >
                     {approved ? `${lang.name} approved` : `Approve ${lang.name} captions`}

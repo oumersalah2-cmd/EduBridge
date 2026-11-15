@@ -55,7 +55,7 @@ const staticHeaderOptions = {
   }
 };
 
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.resolve(__dirname, '../../uploads');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || (fs.existsSync(path.resolve(__dirname, '../uploads')) ? path.resolve(__dirname, '../uploads') : path.resolve(__dirname, '../../uploads'));
 app.use('/uploads', express.static(UPLOADS_DIR, staticHeaderOptions));
 
 const DEMO_ASSETS_DIR = path.resolve(__dirname, '../assets/demo');

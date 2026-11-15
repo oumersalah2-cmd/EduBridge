@@ -35,25 +35,31 @@ export function normalize(d) {
   if (!d) return null;
 
   let captionUrls = [];
-  if (Array.isArray(d.captionUrls)) {
+  if (Array.isArray(d.captionUrls) && d.captionUrls.length > 0) {
     captionUrls = d.captionUrls;
   } else if (d.captions) {
     captionUrls = [
       d.captions.en?.url || d.captions.en?.vttUrl,
-      d.captions.am?.url || d.captions.am?.vttUrl
+      d.captions.am?.url || d.captions.am?.vttUrl,
+      d.captions.om?.url || d.captions.om?.vttUrl,
+      d.captions.ti?.url || d.captions.ti?.vttUrl
     ].filter(Boolean);
   }
 
-  let approved = { en: false, am: false };
+  let approved = { en: false, am: false, om: false, ti: false };
   if (d.approved) {
     approved = {
       en: Boolean(d.approved.en),
-      am: Boolean(d.approved.am)
+      am: Boolean(d.approved.am),
+      om: Boolean(d.approved.om),
+      ti: Boolean(d.approved.ti)
     };
   } else if (d.captions) {
     approved = {
       en: d.captions.en?.reviewStatus === 'human-reviewed' || d.captions.en?.status === 'human-reviewed',
-      am: d.captions.am?.reviewStatus === 'human-reviewed' || d.captions.am?.status === 'human-reviewed'
+      am: d.captions.am?.reviewStatus === 'human-reviewed' || d.captions.am?.status === 'human-reviewed',
+      om: d.captions.om?.reviewStatus === 'human-reviewed' || d.captions.om?.status === 'human-reviewed',
+      ti: d.captions.ti?.reviewStatus === 'human-reviewed' || d.captions.ti?.status === 'human-reviewed'
     };
   }
 
@@ -67,6 +73,7 @@ export function normalize(d) {
     errorMessage: d.error || d.errorMessage || null,
     videoUrl: d.videoUrl || '',
     captionUrls,
+    rawCaptions: d.rawCaptions || null,
     signUrl: d.signUrl || d.signVideoUrl || null,
     approved,
     published: d.status === 'published',
