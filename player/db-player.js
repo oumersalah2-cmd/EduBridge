@@ -71,7 +71,7 @@ class DbPlayer extends HTMLElement {
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    if (oldValue !== newValue && this.shadowRoot.innerHTML) {
+    if (oldValue !== newValue) {
       if (name === 'lang') {
         this.currentLang = ['en', 'am', 'om', 'ti'].includes(newValue) ? newValue : 'en';
         this.captionLang = this.currentLang;
@@ -80,7 +80,7 @@ class DbPlayer extends HTMLElement {
         this.loadExternalCaptions();
       } else if (name === 'lesson' || name === 'lesson-id') {
         this.loadLessonFromApi();
-      } else {
+      } else if (this.shadowRoot && this.shadowRoot.innerHTML) {
         this.render();
       }
     }
@@ -250,7 +250,7 @@ class DbPlayer extends HTMLElement {
     }
   }
 
-  loadTranslations() {
+  async loadTranslations() {
     const TRANSLATIONS = {
       en: {
         playerTitle: "EduBridge Accessible Media Player",
