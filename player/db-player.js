@@ -98,13 +98,13 @@ class DbPlayer extends HTMLElement {
       const res = await fetch(endpoint);
       if (res.ok) {
         const data = await res.json();
-        if (data.videoUrl && !this.getAttribute('src')) {
+        if (data.videoUrl) {
           this.setAttribute('src', data.videoUrl);
         }
-        if (data.signVideoUrl && !this.getAttribute('sign')) {
+        if (data.signVideoUrl) {
           this.setAttribute('sign', data.signVideoUrl);
         }
-        if (data.audioDescriptionUrl && !this.getAttribute('describe')) {
+        if (data.audioDescriptionUrl) {
           this.setAttribute('describe', data.audioDescriptionUrl);
         }
         if (data.offlinePackUrl) {
@@ -560,6 +560,10 @@ class DbPlayer extends HTMLElement {
           position: relative;
           background: #000000;
           outline: none;
+          min-height: 380px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
         }
 
         .player-wrapper:focus-visible {
@@ -570,6 +574,9 @@ class DbPlayer extends HTMLElement {
         video.main-video {
           width: 100%;
           height: auto;
+          min-height: 360px;
+          aspect-ratio: 16 / 9;
+          object-fit: contain;
           max-height: 70vh;
           display: block;
           background: #000000;
@@ -1637,6 +1644,14 @@ class DbPlayer extends HTMLElement {
     video.addEventListener('loadedmetadata', () => {
       durationEl.textContent = formatTime(video.duration);
     });
+    video.addEventListener('durationchange', () => {
+      if (video.duration && !isNaN(video.duration)) {
+        durationEl.textContent = formatTime(video.duration);
+      }
+    });
+    if (video.duration && !isNaN(video.duration)) {
+      durationEl.textContent = formatTime(video.duration);
+    }
 
     video.addEventListener('ended', () => {
       if (signVideo) signVideo.pause();
@@ -2217,6 +2232,13 @@ class DbPlayer extends HTMLElement {
         this.dispatchPrefs();
       });
     });
+
+    if (video && video.src && !video.src.endsWith('/')) {
+      try { video.load(); } catch (e) {}
+    }
+    if (signVideo && signVideo.src && !signVideo.src.endsWith('/')) {
+      try { signVideo.load(); } catch (e) {}
+    }
   }
 
   dispatchPrefs() {
