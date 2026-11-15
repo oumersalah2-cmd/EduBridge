@@ -47,6 +47,9 @@
     <link rel="stylesheet" href="../assets/css/app.css" media="all" />
 
     <link rel="stylesheet" href="../assets/css/static-page.css" media="all" />
+
+    <!-- EduBridge Track 2 Module Script -->
+    <script src="../../player/db-player.js" defer></script>
   </head>
 
   <body class="signed_in env_development notranslate" translate="no" data-theme-suffix="_alx">
@@ -545,6 +548,17 @@
               <span>
                 <div class="savanna-styles">
                   <p><img src="../assets/img/VA-Content-Banner.png" alt="VA-Content-Banner" loading="lazy" /></p>
+
+                  <!-- EduBridge Track 2 Accessible Media Player Mount Point -->
+                  <section class="edubridge-player-embed mb-4" aria-label="Accessible Lesson Media Player">
+                    <db-player
+                      src="../../demo/data/lesson.mp4"
+                      captions="../../demo/data/lesson.en.vtt,../../demo/data/lesson.am.vtt"
+                      sign="../../demo/data/lesson.ethsl.mp4"
+                      lang="am"
+                      api="http://localhost:4000/api">
+                    </db-player>
+                  </section>
                   <figure>
                     <img src="../assets/img/1lhlc1k4XRfVWDFTjczeaSoRpKlMY3dAX.png" alt="Evon afro" loading="lazy" />
                   </figure>
