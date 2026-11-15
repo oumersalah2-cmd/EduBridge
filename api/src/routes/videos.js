@@ -201,6 +201,22 @@ function getArchivedLessonFallback(id) {
   return null;
 }
 
+async function findVideoById(id) {
+  if (!id) return null;
+  let video = null;
+  try {
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      video = await Video.findById(id);
+    } else {
+      video = await Video.findOne({ $or: [{ customId: id }, { isDemo: id === 'demo' }] });
+    }
+  } catch (e) {}
+  if (!video) {
+    video = getArchivedLessonFallback(id);
+  }
+  return video;
+}
+
 // GET /api/videos/:id/preview - Authenticated Studio preview (X-Studio-Key, all statuses except failed)
 videosRouter.get('/:id/preview', studioKey, async (req, res, next) => {
   const { id } = req.params;
@@ -220,18 +236,7 @@ videosRouter.get('/:id/preview', studioKey, async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    try {
-      if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        video = await Video.findById(id);
-      } else {
-        video = await Video.findOne({ $or: [{ _id: id }, { customId: id }] });
-      }
-    } catch (e) {}
-
-    if (!video) {
-      video = getArchivedLessonFallback(id);
-    }
+    const video = await findVideoById(id);
 
     if (!video) {
       return res.status(404).json({
@@ -316,10 +321,7 @@ videosRouter.get('/:id', async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      video = await Video.findById(id);
-    }
+    const video = await findVideoById(id);
     if (!video) {
       return res.status(404).json({
         error: `Lesson video with ID "${id}" was not found.`,
@@ -365,10 +367,7 @@ videosRouter.get('/:id/captions/:lang', async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      video = await Video.findById(id);
-    }
+    const video = await findVideoById(id);
     if (!video) {
       return res.status(404).json({
         error: `Lesson video with ID "${id}" was not found.`,
@@ -444,11 +443,7 @@ videosRouter.put('/:id/captions/:lang', studioKey, async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      video = await Video.findById(id);
-    }
-
+    const video = await findVideoById(id);
     if (!video) {
       return res.status(404).json({
         error: `Lesson video with ID "${id}" was not found.`,
@@ -508,11 +503,7 @@ videosRouter.post('/:id/approve/:lang', studioKey, async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      video = await Video.findById(id);
-    }
-
+    const video = await findVideoById(id);
     if (!video) {
       return res.status(404).json({
         error: `Lesson video with ID "${id}" was not found.`,
@@ -568,11 +559,7 @@ videosRouter.post('/:id/publish', studioKey, async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      video = await Video.findById(id);
-    }
-
+    const video = await findVideoById(id);
     if (!video) {
       return res.status(404).json({
         error: `Lesson video with ID "${id}" was not found.`,
@@ -632,18 +619,7 @@ publicVideosRouter.get('/:id', async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    try {
-      if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        video = await Video.findById(id);
-      } else {
-        video = await Video.findOne({ $or: [{ _id: id }, { customId: id }] });
-      }
-    } catch (e) {}
-
-    if (!video) {
-      video = getArchivedLessonFallback(id);
-    }
+    const video = await findVideoById(id);
 
     if (!video) {
       return res.status(404).json({
@@ -718,12 +694,7 @@ publicVideosRouter.get('/:id/offlinepack', async (req, res, next) => {
   }
 
   try {
-    let video = null;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      video = await Video.findById(id);
-    } else {
-      video = await Video.findOne({ $or: [{ _id: id }, { customId: id }] });
-    }
+    const video = await findVideoById(id);
 
     if (!video) {
       return res.status(404).json({
