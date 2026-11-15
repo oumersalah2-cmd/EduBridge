@@ -85,6 +85,46 @@ function isValidWebVTT(content) {
 // Studio Routes (/api/videos)
 // ==========================================
 
+// GET /api/videos - List creator's lessons
+videosRouter.get('/', async (req, res, next) => {
+  if (process.env.MOCK_API === 'true') {
+    return res.json([getMockPublicVideo('mock-vid-demo', req)]);
+  }
+
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.creatorId) filter.creatorId = req.query.creatorId;
+
+    const videos = await Video.find(filter).sort({ createdAt: -1 }).limit(50);
+    res.json(videos.map((v) => {
+      const captionUrls = [
+        v.captions?.en?.vttUrl ? toAbsoluteUrl(v.captions.en.vttUrl, req) : null,
+        v.captions?.am?.vttUrl ? toAbsoluteUrl(v.captions.am.vttUrl, req) : null
+      ].filter(Boolean);
+
+      return {
+        id: v._id.toString(),
+        title: v.title,
+        status: v.status,
+        progress: v.progress,
+        step: v.step,
+        error: v.error || v.errorMessage || null,
+        errorMessage: v.error || v.errorMessage || null,
+        videoUrl: v.videoUrl ? toAbsoluteUrl(v.videoUrl, req) : null,
+        captionUrls,
+        approved: {
+          en: v.captions?.en?.reviewStatus === 'human-reviewed',
+          am: v.captions?.am?.reviewStatus === 'human-reviewed'
+        },
+        createdAt: v.createdAt
+      };
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/videos - Upload video and optional sign video / audio description (X-Studio-Key)
 videosRouter.post(
   '/',
@@ -261,7 +301,7 @@ videosRouter.get('/:id/preview', studioKey, async (req, res, next) => {
   }
 });
 
-// GET /api/videos/:id - Poll processing progress (for aria-live announcements)
+// GET /api/videos/:id - Poll processing progress (Public/Studio)
 videosRouter.get('/:id', async (req, res, next) => {
   const { id } = req.params;
 
@@ -286,10 +326,77 @@ videosRouter.get('/:id', async (req, res, next) => {
       status: video.status,
       progress: video.progress,
       step: video.step,
-      error: video.error || null
+      error: video.error || video.errorMessage || null
     });
   } catch (err) {
     next(err);
+  }
+});
+
+// GET /api/videos/:id/captions/:lang - Retrieve WebVTT file directly
+videosRouter.get('/:id/captions/:lang', async (req, res, next) => {
+  const { id, lang } = req.params;
+  const allowed = ['en', 'am', 'om'];
+  if (!allowed.includes(lang)) {
+    return res.status(400).json({
+      error: `Invalid language code "${lang}". Supported: ${allowed.join(', ')}.`,
+      code: 'INVALID_LANGUAGE'
+    });
+  }
+
+  if (process.env.MOCK_API === 'true') {
+    res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+    if (lang === 'am') {
+      return res.send('WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nእንኳን ወደዚህ ተደራሽ ትምህርት በደህና መጡ።');
+    }
+    return res.send('WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome to this accessible lesson.');
+  }
+
+  try {
+    let video = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      video = await Video.findById(id);
+    }
+    if (!video) {
+      return res.status(404).json({
+        error: `Lesson video with ID "${id}" was not found.`,
+        code: 'LESSON_NOT_FOUND'
+      });
+    }
+
+    const track = video.captions && video.captions[lang];
+    const candidatePath = track?.vttPath || path.join(CAPTIONS_DIR, `${video._id}_${lang}.vtt`);
+
+    if (fs.existsSync(candidatePath)) {
+      res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+      return res.send(fs.readFileSync(candidatePath, 'utf8'));
+    }
+
+    return res.status(404).json({
+      error: `No ${lang} captions found for this video.`,
+      code: 'CAPTIONS_NOT_FOUND'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/videos/:id/retry - Retry processing for a failed video (X-Studio-Key)
+videosRouter.post('/:id/retry', studioKey, async (req, res, next) => {
+  const { id } = req.params;
+  try {
+    const queue = require('../services/pipelineQueue');
+    const video = await queue.retryVideo(id);
+    res.json({
+      id: video._id.toString(),
+      status: video.status,
+      step: video.step
+    });
+  } catch (err) {
+    res.status(400).json({
+      error: err.message || 'Retry operation failed.',
+      code: 'RETRY_FAILED'
+    });
   }
 });
 

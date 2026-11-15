@@ -42,7 +42,7 @@ export default function CaptionsStep({ lesson, onChange, announce }) {
                 <div className="mt-3 flex flex-wrap gap-3">
                   {url && (
                     <a
-                      href={`/editor/index.html?src=${encodeURIComponent(url)}&lang=${lang.code}`}
+                      href={`/editor/index.html?id=${encodeURIComponent(lesson.id)}&lang=${lang.code}&video=${encodeURIComponent(lesson.videoUrl || '')}&src=${encodeURIComponent(url)}`}
                       target="_blank" rel="noopener noreferrer"
                       className="inline-flex min-h-11 items-center rounded border-2 border-blue-800 px-5 text-lg font-semibold text-blue-800 underline"
                     >

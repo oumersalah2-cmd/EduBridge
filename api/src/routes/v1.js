@@ -31,6 +31,48 @@ function isValidWebVTT(content) {
 // Lessons Endpoints (/api/v1/lessons)
 // -------------------------------------------------------------
 
+// POST /api/v1/lessons - Alias to video upload
+router.post('/lessons', (req, res, next) => {
+  const { videosRouter } = require('./videos');
+  req.url = '/';
+  return videosRouter.handle(req, res, next);
+});
+
+// GET /api/v1/lessons - Alias to video list
+router.get('/lessons', (req, res, next) => {
+  const { videosRouter } = require('./videos');
+  req.url = '/';
+  return videosRouter.handle(req, res, next);
+});
+
+// POST /api/v1/lessons/:id/approve/:lang - Alias to approve
+router.post('/lessons/:id/approve/:lang', (req, res, next) => {
+  const { videosRouter } = require('./videos');
+  req.url = `/${req.params.id}/approve/${req.params.lang}`;
+  return videosRouter.handle(req, res, next);
+});
+
+// POST /api/v1/lessons/:id/publish - Alias to publish
+router.post('/lessons/:id/publish', (req, res, next) => {
+  const { videosRouter } = require('./videos');
+  req.url = `/${req.params.id}/publish`;
+  return videosRouter.handle(req, res, next);
+});
+
+// POST /api/v1/lessons/:id/retry - Alias to retry
+router.post('/lessons/:id/retry', (req, res, next) => {
+  const { videosRouter } = require('./videos');
+  req.url = `/${req.params.id}/retry`;
+  return videosRouter.handle(req, res, next);
+});
+
+// GET /api/v1/lessons/:id/captions/:lang - Alias to caption download
+router.get('/lessons/:id/captions/:lang', (req, res, next) => {
+  const { videosRouter } = require('./videos');
+  req.url = `/${req.params.id}/captions/${req.params.lang}`;
+  return videosRouter.handle(req, res, next);
+});
+
 // GET /api/v1/lessons/:id - Published lesson metadata with tracks and offlinePackSizeBytes
 router.get('/lessons/:id', async (req, res, next) => {
   const { id } = req.params;
@@ -48,6 +90,11 @@ router.get('/lessons/:id', async (req, res, next) => {
     }
     return res.json({
       ...mock,
+      captionUrls: [mock.captions.en.url, mock.captions.am.url],
+      approved: {
+        en: mock.captions.en.reviewStatus === 'human-reviewed',
+        am: mock.captions.am.reviewStatus === 'human-reviewed'
+      },
       tracks,
       offlinePackSizeBytes: 1048576 // 1MB mock size
     });
@@ -73,13 +120,17 @@ router.get('/lessons/:id', async (req, res, next) => {
     }
 
     if (video.status !== 'published') {
-      return res.status(409).json({
-        error: `This lesson is currently "${video.status}" and is not yet available for public access.`,
-        code: 'LESSON_NOT_PUBLISHED'
-      });
+      const isStudio = Boolean(req.header('X-Studio-Key') || req.query.status === 'all' || req.query.preview === 'true');
+      if (!isStudio) {
+        return res.status(409).json({
+          error: `This lesson is currently "${video.status}" and is not yet available for public access.`,
+          code: 'LESSON_NOT_PUBLISHED'
+        });
+      }
     }
 
     const captions = {};
+    const captionUrls = [];
     const tracks = [];
 
     ['en', 'am', 'om'].forEach((lang) => {
@@ -88,6 +139,7 @@ router.get('/lessons/:id', async (req, res, next) => {
         const absoluteUrl = toAbsoluteUrl(track.vttUrl || track.url || `/uploads/captions/${video._id}_${lang}.vtt`, req);
         const reviewStatus = track.reviewStatus || track.status || 'machine-generated';
         captions[lang] = { url: absoluteUrl, reviewStatus };
+        captionUrls.push(absoluteUrl);
         tracks.push({
           kind: 'captions',
           lang,
@@ -134,11 +186,21 @@ router.get('/lessons/:id', async (req, res, next) => {
       id: video._id.toString(),
       title: video.title,
       status: video.status,
+      progress: video.progress,
+      step: video.step,
+      error: video.error || video.errorMessage || null,
+      errorMessage: video.error || video.errorMessage || null,
       videoUrl,
       audioUrl: toAbsoluteUrl(video.audioUrl || video.audioPath || '', req),
+      signUrl: video.signVideoUrl ? toAbsoluteUrl(video.signVideoUrl, req) : null,
       signVideoUrl: video.signVideoUrl ? toAbsoluteUrl(video.signVideoUrl, req) : null,
       audioDescriptionUrl: video.audioDescriptionUrl ? toAbsoluteUrl(video.audioDescriptionUrl, req) : null,
       captions,
+      captionUrls,
+      approved: {
+        en: video.captions?.en?.reviewStatus === 'human-reviewed',
+        am: video.captions?.am?.reviewStatus === 'human-reviewed'
+      },
       tracks,
       transcript: video.transcript || video.transcriptText || '',
       chatLog: Array.isArray(video.chatLog) ? video.chatLog.map((c) => ({

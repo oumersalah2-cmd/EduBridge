@@ -42,6 +42,8 @@ async function startServer() {
       console.log(`Connected to MongoDB at ${MONGO_URL}`);
       const { seedDatabaseIfEmpty } = require('../scripts/seed-demo');
       await seedDatabaseIfEmpty();
+      const pipelineQueue = require('./services/pipelineQueue');
+      await pipelineQueue.resumePendingJobs();
     } catch (err) {
       console.warn(`MongoDB connection warning: ${err.message}. Starting in offline/standalone mode.`);
     }

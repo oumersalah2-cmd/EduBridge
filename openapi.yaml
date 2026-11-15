@@ -614,6 +614,59 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
 
   /api/videos:
+    get:
+      summary: List Lessons / Videos
+      description: Returns a list of uploaded and processed lessons for the teacher studio.
+      operationId: listVideos
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [uploaded, processing, review, published, failed]
+        - name: creatorId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of videos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    title:
+                      type: string
+                    status:
+                      type: string
+                    progress:
+                      type: number
+                    step:
+                      type: string
+                    error:
+                      type: string
+                      nullable: true
+                    videoUrl:
+                      type: string
+                      nullable: true
+                    captionUrls:
+                      type: array
+                      items:
+                        type: string
+                    approved:
+                      type: object
+                      properties:
+                        en:
+                          type: boolean
+                        am:
+                          type: boolean
     post:
       summary: Upload Video for Processing
       description: Uploads video file (and optional sign-language video) and queues it for audio extraction and captioning.
@@ -728,6 +781,35 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/videos/{id}/captions/{lang}:
+    get:
+      summary: Retrieve WebVTT Captions
+      description: Returns raw WebVTT caption file for specified language (en, am, om).
+      operationId: getCaptionsVtt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lang
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [en, am, om]
+      responses:
+        '200':
+          description: WebVTT file content
+          content:
+            text/vtt:
+              schema:
+                type: string
+        '404':
+          description: Captions not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Save Human-Edited WebVTT Captions
       description: Saves human-edited WebVTT captions for en, am, or om. Resets review approval to unapproved.
@@ -836,6 +918,40 @@ paths:
                 $ref: '#/components/schemas/PublishResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/videos/{id}/retry:
+    post:
+      summary: Retry Failed Video Processing
+      description: Resets and queues a previously failed video for processing without re-uploading the source file.
+      operationId: retryVideoProcessing
+      security:
+        - StudioKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Video processing re-queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                  step:
+                    type: string
+        '400':
+          description: Retry failed
           content:
             application/json:
               schema:

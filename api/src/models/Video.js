@@ -18,8 +18,12 @@ const CaptionTrackSchema = new mongoose.Schema({
 
 const VideoSchema = new mongoose.Schema({
   customId: { type: String, index: true },
+  creatorId: { type: String, default: 'creator-default', index: true },
   isDemo: { type: Boolean, default: false },
   title: { type: String, default: 'Untitled Lesson' },
+  description: { type: String, default: '' },
+  duration: { type: Number, default: 0 },
+  languages: { type: [String], default: ['en', 'am'] },
   status: {
     type: String,
     enum: ['uploaded', 'live', 'processing', 'review', 'published', 'failed'],
@@ -29,6 +33,8 @@ const VideoSchema = new mongoose.Schema({
   progress: { type: Number, default: 0, min: 0, max: 100 },
   step: { type: String, default: 'Video uploaded. Queued for audio extraction and transcription.' },
   error: { type: String, default: null },
+  errorMessage: { type: String, default: null },
+  publishedAt: { type: Date, default: null },
 
   // Source and media file paths
   sourcePath: { type: String },
@@ -53,6 +59,7 @@ const VideoSchema = new mongoose.Schema({
     am: { type: CaptionTrackSchema, default: () => ({}) },
     om: { type: CaptionTrackSchema, default: () => ({}) }
   },
+  captionUrls: { type: [String], default: [] },
   transcript: { type: String, default: '' },
   transcriptText: { type: String, default: '' },
   transcriptPath: { type: String },
@@ -65,8 +72,6 @@ const VideoSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
   }],
 
-  offlinePackPath: { type: String },
-  offlinePackUrl: { type: String },
   braillePath: { type: String },
   brailleUrl: { type: String },
 

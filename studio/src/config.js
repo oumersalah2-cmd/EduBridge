@@ -2,19 +2,23 @@
 
 export const LIMITS = { maxVideoMB: 200 };
 
-// ASK MEMBER 3: the script and tag name of the player.
+// Member 3 embed script and tag
 export const PLAYER = {
   scriptUrl: '/module/db-player.js',
   tag: 'db-player',
 };
 
-// ASK MEMBER 1 / read openapi.yaml: match these paths to the real backend.
-// With no VITE_API_URL set, the Studio runs in demo (mock) mode and needs no backend.
+// API routes matching backend contracts (both /api/videos and /api/v1/lessons).
+// In development or Docker same-origin, VITE_API_URL is typically empty, using relative paths.
+// Set VITE_MOCK_API="true" only if you want offline demo mode without backend.
 export const API = {
   base: import.meta.env.VITE_API_URL || '',
-  mock: !import.meta.env.VITE_API_URL,
-  upload: '/api/v1/lessons',
-  lesson: (id) => `/api/v1/lessons/${id}`,
-  approve: (id, lang) => `/api/v1/lessons/${id}/approve/${lang}`,
-  publish: (id) => `/api/v1/lessons/${id}/publish`,
+  mock: import.meta.env.VITE_MOCK_API === 'true',
+  upload: '/api/videos',
+  lesson: (id) => `/api/videos/${id}`,
+  approve: (id, lang) => `/api/videos/${id}/approve/${lang}`,
+  publish: (id) => `/api/videos/${id}/publish`,
+  retry: (id) => `/api/videos/${id}/retry`,
+  captions: (id, lang) => `/api/videos/${id}/captions/${lang}`,
+  list: '/api/videos',
 };

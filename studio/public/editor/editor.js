@@ -59,9 +59,17 @@
   };
 
   var DRAFT_KEY = 'edubridge:editor:draft';
-  var state = { cues: [], name: 'captions.vtt', current: 0, ui: 'en', capLang: 'en' };
+  var state = { cues: [], name: 'captions.vtt', current: 0, ui: 'en', capLang: 'en', videoId: null };
   var stopAt = null;
   var saveTimer = null;
+
+  function getStudioKey() {
+    try {
+      var saved = localStorage.getItem('edubridge:studio_key');
+      if (saved && saved.trim()) return saved.trim();
+    } catch (e) {}
+    return 'change-me-to-a-long-random-string';
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   var list = $('lines'), statusEl = $('status'), errorEl = $('error'), video = $('preview');
@@ -102,16 +110,41 @@
 
       var head = document.createElement('div');
       head.className = 'line-head';
+
       var label = document.createElement('label');
       label.htmlFor = 'text-' + i;
-      label.textContent = t().lineLabel(n, EduVtt.formatTime(cue.start, true), EduVtt.formatTime(cue.end, true));
+      label.textContent = 'Line ' + n;
+
+      var times = document.createElement('div');
+      times.className = 'times';
+
+      var startIn = document.createElement('input');
+      startIn.type = 'text';
+      startIn.className = 'time-input';
+      startIn.value = EduVtt.formatTime(cue.start);
+      startIn.setAttribute('data-act', 'start-time');
+      startIn.setAttribute('aria-label', 'Start time for line ' + n);
+
+      var arrow = document.createElement('span');
+      arrow.textContent = '→';
+      arrow.setAttribute('aria-hidden', 'true');
+
+      var endIn = document.createElement('input');
+      endIn.type = 'text';
+      endIn.className = 'time-input';
+      endIn.value = EduVtt.formatTime(cue.end);
+      endIn.setAttribute('data-act', 'end-time');
+      endIn.setAttribute('aria-label', 'End time for line ' + n);
+
+      times.append(startIn, arrow, endIn);
+
       var play = document.createElement('button');
       play.type = 'button';
       play.className = 'btn small';
       play.setAttribute('data-act', 'play');
       play.setAttribute('aria-label', t().playLineN(n));
       play.textContent = t().playLine;
-      head.append(label, play);
+      head.append(label, times, play);
 
       var ta = document.createElement('textarea');
       ta.id = 'text-' + i;
@@ -133,12 +166,39 @@
     updateSummary();
   }
 
-  // Save a draft to this device. Speak "Saved" only when asked to.
-  function saveDraft(speak) {
+  // Save draft locally and to the backend if videoId is set.
+  async function saveDraft(speak) {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({ name: state.name, capLang: state.capLang, cues: state.cues }));
       $('restore-btn').disabled = false;
     } catch (e) { /* storage full or blocked: editing still works */ }
+
+    if (state.videoId && state.cues && state.cues.length) {
+      try {
+        var vttContent = EduVtt.serializeVtt(state.cues);
+        var putUrl = '/api/videos/' + encodeURIComponent(state.videoId) + '/captions/' + encodeURIComponent(state.capLang);
+        var res = await fetch(putUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'text/vtt; charset=utf-8',
+            'X-Studio-Key': getStudioKey()
+          },
+          body: vttContent
+        });
+        if (!res.ok) {
+          var errData = await res.json().catch(function () { return {}; });
+          throw new Error(errData.error || ('Server rejected captions (' + res.status + ')'));
+        }
+        showError('');
+        if (speak) announce(t().saved + ' to server and local draft');
+        return;
+      } catch (err) {
+        showError('Warning: Could not save to backend server (' + err.message + '). Saved to local draft.');
+        if (speak) announce('Could not save to server. Saved to local draft.');
+        return;
+      }
+    }
+
     if (speak) announce(t().saved);
   }
 
@@ -245,9 +305,27 @@
     saveSoon();
   });
   list.addEventListener('change', function (e) {
-    var i = Number(e.target.closest('li').getAttribute('data-index'));
-    if (e.target.tagName === 'TEXTAREA') saveDraft(true);
-    else if (e.target.getAttribute('data-act') === 'flag') setFlag(i, e.target.checked);
+    var li = e.target.closest('li');
+    if (!li) return;
+    var i = Number(li.getAttribute('data-index'));
+    var cue = state.cues[i];
+    if (!cue) return;
+
+    if (e.target.getAttribute('data-act') === 'start-time') {
+      var pStart = EduVtt.parseTime(e.target.value);
+      cue.start = pStart;
+      e.target.value = EduVtt.formatTime(pStart);
+      saveDraft(false);
+    } else if (e.target.getAttribute('data-act') === 'end-time') {
+      var pEnd = EduVtt.parseTime(e.target.value);
+      cue.end = pEnd;
+      e.target.value = EduVtt.formatTime(pEnd);
+      saveDraft(false);
+    } else if (e.target.tagName === 'TEXTAREA') {
+      saveDraft(true);
+    } else if (e.target.getAttribute('data-act') === 'flag') {
+      setFlag(i, e.target.checked);
+    }
   });
   list.addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act="play"]');
@@ -298,11 +376,24 @@
   try { $('restore-btn').disabled = !localStorage.getItem(DRAFT_KEY); } catch (e) { /* blocked */ }
   applyText();
 
-  // Studio link: editor/index.html?src=/path/to/file.vtt&lang=am opens that file directly.
+  // Studio link: editor/index.html?id=123&lang=am&video=/url/to/video.mp4&src=/path/to/file.vtt opens that file directly.
   var params = new URLSearchParams(location.search);
-  if (params.get('lang') === 'am') { state.capLang = 'am'; $('cap-lang').value = 'am'; }
+  var videoId = params.get('id');
+  if (videoId) {
+    state.videoId = videoId;
+  }
+  if (params.get('lang') === 'am') {
+    state.capLang = 'am';
+    $('cap-lang').value = 'am';
+  }
+  if (params.get('video')) {
+    video.src = params.get('video');
+    video.hidden = false;
+  }
   if (params.get('src')) {
     var src = params.get('src');
     loadUrl(src, src.split('/').pop() || 'captions.vtt', t().errLoad);
+  } else if (videoId) {
+    loadUrl('/api/videos/' + encodeURIComponent(videoId) + '/captions/' + encodeURIComponent(state.capLang), videoId + '_' + state.capLang + '.vtt', t().errLoad);
   }
 })();

@@ -4,6 +4,7 @@ const Video = require('../models/Video');
 const ffmpegService = require('./ffmpegService');
 const whisperService = require('./whisperService');
 const vttConverter = require('./vttConverter');
+const { translateSegments } = require('./translationService');
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.resolve(__dirname, '../../uploads');
 const AUDIO_DIR = path.join(UPLOADS_DIR, 'audio');
@@ -182,59 +183,133 @@ class PipelineQueue {
     });
 
     const segments = transcriptionResult.segments || [];
-    const vttContent = vttConverter.segmentsToWebVTT(segments);
     const transcriptText = vttConverter.segmentsToTranscript(segments);
-
-    const vttFilename = `${video._id}_en.vtt`;
-    const vttPath = path.join(CAPTIONS_DIR, vttFilename);
-    fs.writeFileSync(vttPath, vttContent, 'utf8');
-
-    video.captions = video.captions || {};
-    video.captions.en = {
-      vttPath,
-      vttUrl: `/uploads/captions/${vttFilename}`,
-      status: 'machine-generated',
-      reviewStatus: 'machine-generated'
-    };
     video.transcript = transcriptText;
     video.transcriptText = transcriptText;
 
-    // Amharic Human First: AMHARIC_MODE=direct (Whisper language am as draft) or off (no am track until human submits)
-    const amharicMode = process.env.AMHARIC_MODE || 'off';
-    if (amharicMode === 'direct') {
-      try {
-        console.log('[Pipeline] Generating Amharic draft caption track via Whisper...');
-        const amResult = await whisperService.transcribeAudio(wavPath, {
-          model: process.env.WHISPER_MODEL || 'base',
-          language: 'am'
-        });
-        const amSegments = amResult.segments || [];
-        if (amSegments.length > 0) {
-          const amVttContent = vttConverter.segmentsToWebVTT(amSegments);
-          const amVttFilename = `${video._id}_am.vtt`;
-          const amVttPath = path.join(CAPTIONS_DIR, amVttFilename);
-          fs.writeFileSync(amVttPath, amVttContent, 'utf8');
+    // Never overwrite human-edited captions automatically
+    const isEnHumanReviewed = video.captions?.en?.reviewStatus === 'human-reviewed';
+    const vttFilename = `${video._id}_en.vtt`;
+    const vttPath = path.join(CAPTIONS_DIR, vttFilename);
 
-          video.captions.am = {
-            vttPath: amVttPath,
-            vttUrl: `/uploads/captions/${amVttFilename}`,
-            status: 'machine-generated',
-            reviewStatus: 'machine-generated'
-          };
-          video.markModified('captions');
+    if (!isEnHumanReviewed || !fs.existsSync(vttPath)) {
+      const vttContent = vttConverter.segmentsToWebVTT(segments);
+      fs.writeFileSync(vttPath, vttContent, 'utf8');
+
+      video.captions = video.captions || {};
+      video.captions.en = {
+        vttPath,
+        vttUrl: `/uploads/captions/${vttFilename}`,
+        status: 'machine-generated',
+        reviewStatus: 'machine-generated'
+      };
+    }
+
+    // Amharic Caption Generation: Translate English segments or transcribe directly if AMHARIC_MODE=direct
+    const isAmHumanReviewed = video.captions?.am?.reviewStatus === 'human-reviewed';
+    const amVttFilename = `${video._id}_am.vtt`;
+    const amVttPath = path.join(CAPTIONS_DIR, amVttFilename);
+
+    if (!isAmHumanReviewed) {
+      const amharicMode = process.env.AMHARIC_MODE || 'translate'; // 'translate', 'direct', or 'off'
+      if (amharicMode === 'direct') {
+        try {
+          console.log('[Pipeline] Generating Amharic draft caption track via Whisper...');
+          const amResult = await whisperService.transcribeAudio(wavPath, {
+            model: process.env.WHISPER_MODEL || 'base',
+            language: 'am'
+          });
+          const amSegments = amResult.segments || [];
+          if (amSegments.length > 0) {
+            const amVttContent = vttConverter.segmentsToWebVTT(amSegments);
+            fs.writeFileSync(amVttPath, amVttContent, 'utf8');
+
+            video.captions.am = {
+              vttPath: amVttPath,
+              vttUrl: `/uploads/captions/${amVttFilename}`,
+              status: 'machine-generated',
+              reviewStatus: 'machine-generated'
+            };
+          }
+        } catch (amErr) {
+          console.warn('[Pipeline] Amharic draft transcription skipped or failed:', amErr.message);
         }
-      } catch (amErr) {
-        console.warn('[Pipeline] Amharic draft transcription skipped or failed:', amErr.message);
+      } else if (amharicMode !== 'off') {
+        try {
+          console.log('[Pipeline] Translating English segments into Amharic preserving timestamps...');
+          const amSegments = await translateSegments(segments, 'am', 'en');
+          if (amSegments.length > 0) {
+            const amVttContent = vttConverter.segmentsToWebVTT(amSegments);
+            fs.writeFileSync(amVttPath, amVttContent, 'utf8');
+
+            video.captions.am = {
+              vttPath: amVttPath,
+              vttUrl: `/uploads/captions/${amVttFilename}`,
+              status: 'machine-generated',
+              reviewStatus: 'machine-generated'
+            };
+          }
+        } catch (transErr) {
+          console.warn('[Pipeline] Amharic translation skipped or failed:', transErr.message);
+        }
       }
     }
+
+    if (typeof video.markModified === 'function') {
+      video.markModified('captions');
+    }
+
+    // Populate helper captionUrls array
+    video.captionUrls = [
+      video.captions.en?.vttUrl,
+      video.captions.am?.vttUrl
+    ].filter(Boolean);
 
     // Step 6: Review ready at 100%
     await this.updateVideoState(video, {
       status: 'review',
       progress: 100,
       step: 'Transcription complete. Human review ready.',
-      error: null
+      error: null,
+      errorMessage: null
     });
+  }
+
+  async retryVideo(videoId) {
+    let video = await Video.findById(videoId);
+    if (!video) {
+      throw new Error(`Video with id "${videoId}" not found.`);
+    }
+
+    const sourcePath = video.sourcePath || video.videoPath;
+    if (!sourcePath || !fs.existsSync(sourcePath)) {
+      throw new Error('Cannot retry: Original source video file is no longer on disk.');
+    }
+
+    await this.updateVideoState(video, {
+      status: 'uploaded',
+      progress: 0,
+      step: 'Retrying video processing...',
+      error: null,
+      errorMessage: null
+    });
+
+    this.enqueue(video._id.toString());
+    return video;
+  }
+
+  async resumePendingJobs() {
+    try {
+      const pendingVideos = await Video.find({ status: { $in: ['uploaded', 'processing'] } });
+      if (pendingVideos.length > 0) {
+        console.log(`[PipelineQueue] Resuming ${pendingVideos.length} pending video jobs...`);
+        for (const vid of pendingVideos) {
+          this.enqueue(vid._id.toString());
+        }
+      }
+    } catch (err) {
+      console.warn('[PipelineQueue] Could not resume pending jobs:', err.message);
+    }
   }
 }
 
