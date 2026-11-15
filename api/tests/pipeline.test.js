@@ -171,7 +171,7 @@ describe('Job 2: Phase B Core Pipeline Tests (MOCK_API=false)', () => {
       expect(mockVideoRecord.captions.en).toBeDefined();
       expect(mockVideoRecord.captions.en.reviewStatus).toBe('machine-generated');
       expect(mockVideoRecord.transcript).toContain('solar energy');
-    });
+    }, 15000);
 
     it('handles corrupted video files with status: failed and accessible error message', async () => {
       const corruptId = '507f191e810c19729de860eb';

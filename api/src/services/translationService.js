@@ -95,59 +95,103 @@ function getDictionaryForLang(lang) {
   return OFFLINE_DICTIONARY_AM;
 }
 
-/**
- * Translates text from English to target language (Amharic 'am', Afaan Oromoo 'om', Tigrinya 'ti').
- * Uses online Google Translate GTX API with fast 4-second timeout,
- * and falls back gracefully to dictionary/transcription if offline.
- */
-function translateText(text, targetLang = 'am', sourceLang = 'en') {
-  if (!text || typeof text !== 'string') return Promise.resolve('');
-  const clean = text.trim();
-  if (!clean) return Promise.resolve('');
+function decodeHtmlEntities(str) {
+  if (!str) return '';
+  return str
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+}
 
-  return new Promise((resolve) => {
-    const dict = getDictionaryForLang(targetLang);
-    const lower = clean.toLowerCase();
-    for (const [enKey, targetVal] of Object.entries(dict)) {
-      if (lower === enKey) {
-        return resolve(targetVal);
-      }
-    }
-
-    const encoded = encodeURIComponent(clean);
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encoded}`;
-
-    const req = https.get(url, { timeout: 4000 }, (res) => {
-      if (res.statusCode !== 200) {
-        res.resume();
-        return resolve(fallbackTranslate(clean, targetLang));
-      }
-
-      let rawData = '';
-      res.setEncoding('utf8');
-      res.on('data', (chunk) => { rawData += chunk; });
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(rawData);
-          if (Array.isArray(parsed) && Array.isArray(parsed[0])) {
-            const translated = parsed[0].map((item) => (item && item[0]) || '').join('').trim();
-            if (translated) {
-              return resolve(translated);
-            }
-          }
-          resolve(fallbackTranslate(clean, targetLang));
-        } catch (e) {
-          resolve(fallbackTranslate(clean, targetLang));
+function fetchJson(url, timeoutMs = 4000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      url,
+      {
+        timeout: timeoutMs,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (EduBridge Accessible Media Platform)',
+          'Accept': 'application/json'
         }
-      });
-    });
-
-    req.on('error', () => resolve(fallbackTranslate(clean, targetLang)));
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { raw += chunk; });
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(raw));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+    );
+    req.on('error', reject);
     req.on('timeout', () => {
       req.destroy();
-      resolve(fallbackTranslate(clean, targetLang));
+      reject(new Error('Timeout'));
     });
   });
+}
+
+/**
+ * Translates text from English to target language (Amharic 'am', Afaan Oromoo 'om', Tigrinya 'ti').
+ * Uses online MyMemory & Google Translate APIs with fast timeout,
+ * and falls back gracefully to dictionary/transcription if offline.
+ */
+async function translateText(text, targetLang = 'am', sourceLang = 'en') {
+  if (!text || typeof text !== 'string') return '';
+  const clean = text.trim();
+  if (!clean) return '';
+
+  const dict = getDictionaryForLang(targetLang);
+  const lower = clean.toLowerCase();
+  for (const [enKey, targetVal] of Object.entries(dict)) {
+    if (lower === enKey) {
+      return targetVal;
+    }
+  }
+
+  // 1. Try MyMemory Translation API (reliable for Amharic, Oromo, Tigrinya)
+  try {
+    const encoded = encodeURIComponent(clean);
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encoded}&langpair=${sourceLang}|${targetLang}`;
+    const data = await fetchJson(myMemoryUrl, 5000);
+    if (data && data.responseData && data.responseData.translatedText) {
+      const candidate = decodeHtmlEntities(data.responseData.translatedText).trim();
+      if (candidate && !candidate.startsWith('MYMEMORY WARNING:')) {
+        return candidate;
+      }
+    }
+  } catch (e) {
+    // try next
+  }
+
+  // 2. Try Google Translate GTX API
+  try {
+    const encoded = encodeURIComponent(clean);
+    const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encoded}`;
+    const parsed = await fetchJson(googleUrl, 3000);
+    if (Array.isArray(parsed) && Array.isArray(parsed[0])) {
+      const translated = parsed[0].map((item) => (item && item[0]) || '').join('').trim();
+      if (translated) {
+        return translated;
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  // 3. Fallback to offline educational dictionary
+  return fallbackTranslate(clean, targetLang);
 }
 
 /**
