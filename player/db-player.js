@@ -48,7 +48,7 @@ class DbPlayer extends HTMLElement {
     };
 
     // Ethiopian Sign Language (EthSL) state
-    this.signVisible = false;
+    this.signVisible = true;
     this.signPosition = localStorage.getItem('edubridge_sign_position') || 'bottom-right';
     this.signSize = localStorage.getItem('edubridge_sign_size') || 'medium';
 
